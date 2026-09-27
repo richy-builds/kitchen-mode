@@ -105,6 +105,18 @@
 
   const recipe = findRecipe();
   const steps = recipe ? getSteps(recipe.recipeInstructions).map(s => ({ ...s, sentences: splitSentences(s.text) })) : [];
+
+  // One anonymous count per open: the site's name, whether it found a recipe, and the build date, since
+  // installed copies never update. No page address and no ID. See "Usage counts" in the README.
+  try {
+    if (location.hostname) fetch('%COUNT_URL%', {
+      method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
+      body: JSON.stringify({
+        api_key: '%POSTHOG_KEY%', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
+        properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '%BUILD%', $process_person_profile: false },
+      }),
+    }).catch(() => {});
+  } catch {}
   if (!steps.length) { toast("Kitchen Mode couldn't find a recipe on this page."); return; }
 
   const title = clean(recipe.name) || document.title;

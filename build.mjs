@@ -5,8 +5,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const HANDLE = 'richyjudge';
 // Where the page is deployed. Link previews on X need the full address of og.png.
 const SITE_URL = 'https://kitchen-mode.vercel.app';
+// PostHog project (EU) for the anonymous usage counts. The key is public by design: it can send events, not read them.
+const POSTHOG_KEY = 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0';
+// Counts go through this site (see vercel.json), so ad blockers that block posthog.com let them through.
+const COUNT_URL = SITE_URL + '/relay/i/v0/e/';
 
 const source = readFileSync(new URL('./kitchen-mode.js', import.meta.url), 'utf8')
+  .replace('%COUNT_URL%', COUNT_URL)
+  .replace('%POSTHOG_KEY%', POSTHOG_KEY)
+  .replace('%BUILD%', new Date().toISOString().slice(0, 10))
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .split('\n')
   .map(line => line.trim())
@@ -561,6 +568,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
     .lede { margin-top: 20px; }
   }
 </style>
+<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <div class="drop-cue" id="drop-cue" hidden>${icon(UP, 22, 2.8)} Drop it on your bookmarks bar, just above this page ${icon(UP, 22, 2.8)}</div>
@@ -740,7 +748,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 
 <footer class="foot">
   <div class="wrap">
-    <span>Kitchen Mode · Free · Runs in your browser and sends nothing anywhere</span>
+    <span>Kitchen Mode · Free · Runs in your browser. Sends one anonymous count per use: the site’s name and whether it found a recipe</span>
     ${HANDLE ? `<a href="https://x.com/${HANDLE}">Made by @${HANDLE}</a>` : ''}
   </div>
 </footer>
@@ -748,11 +756,25 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 <script>
 var SAMPLE = ${JSON.stringify(sample)};
 
+// Anonymous counts for the install funnel: one random ID per visit, no cookies, nothing when opened from a file.
+var visit = Math.random().toString(36).slice(2);
+function count(event, props) {
+  if (!location.hostname) return;
+  props = props || {};
+  props.$process_person_profile = false;
+  fetch('${COUNT_URL}', {
+    method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true,
+    body: JSON.stringify({ api_key: '${POSTHOG_KEY}', event: 'kitchen_mode_' + event, distinct_id: visit, properties: props })
+  }).catch(function () {});
+}
+count('page_viewed', { from: document.referrer ? new URL(document.referrer).hostname : '' });
+
 function runKitchenMode() {
 ${source.replace(/<\/script/gi, '<\\/script')}
 }
 
 function tryIt() {
+  count('tried');
   if (!document.getElementById('sample-recipe')) {
     var s = document.createElement('script');
     s.type = 'application/ld+json';
@@ -771,11 +793,19 @@ var dropCue = document.getElementById('drop-cue');
 document.querySelectorAll('.bookmarklet').forEach(function (a) {
   a.addEventListener('click', function (e) {
     e.preventDefault();
+    count('button_clicked');
     document.getElementById(a.dataset.tip).textContent =
       'Drag the button rather than clicking it: press and hold, then drop it on your bookmarks bar.';
   });
-  a.addEventListener('dragstart', function () { requestAnimationFrame(function () { dropCue.hidden = false; }); });
-  a.addEventListener('dragend', function () { dropCue.hidden = true; });
+  a.addEventListener('dragstart', function () {
+    count('drag_started');
+    requestAnimationFrame(function () { dropCue.hidden = false; });
+  });
+  // dropEffect is "none" when the drag was cancelled; anything else means it landed, most likely on the bookmarks bar.
+  a.addEventListener('dragend', function (e) {
+    dropCue.hidden = true;
+    count('drag_ended', { effect: e.dataTransfer.dropEffect });
+  });
 });
 
 // Show the shortcut for this computer: Cmd on a Mac, Ctrl everywhere else.
@@ -786,6 +816,7 @@ if (matchMedia('(pointer: coarse)').matches) document.getElementById('phone').op
 document.getElementById('copy').addEventListener('click', function () {
   var btn = this, code = document.querySelector('.bookmarklet').getAttribute('href');
   function done() {
+    count('code_copied');
     btn.textContent = 'Code copied';
     setTimeout(function () { btn.textContent = 'Copy the code'; }, 2500);
   }

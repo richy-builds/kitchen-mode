@@ -16,7 +16,7 @@ Click the bookmark on a recipe page and you get:
 - the screen kept awake while it's open
 - keyboard, tap, swipe, foot pedal or presentation clicker to move through the steps
 
-It runs entirely in the browser and doesn't send anything anywhere.
+It runs in the browser. Each time it opens it sends one anonymous count: the site's name, whether it found a recipe, and which build it is. Never the page address, the recipe or anything about you (see [Usage counts](#usage-counts)).
 
 ## How it works
 
@@ -33,7 +33,8 @@ Recipe sites publish a structured copy of each recipe ([schema.org Recipe](https
 | File | What it is |
 |---|---|
 | `kitchen-mode.js` | Readable source of the bookmarklet. Edit this one. |
-| `build.mjs` | Builds `index.html`: strips comments, turns the source into a `javascript:` URL, and writes the landing page with the sample recipe. `HANDLE` and `SITE_URL` are set at the top. |
+| `build.mjs` | Builds `index.html`: strips comments, turns the source into a `javascript:` URL, and writes the landing page with the sample recipe. `HANDLE`, `SITE_URL` and `POSTHOG_KEY` are set at the top. |
+| `vercel.json` | Forwards `/relay/*` to PostHog's EU servers, so ad blockers that block posthog.com don't drop the counts. |
 | `index.html` | The generated landing page. Don't edit by hand. |
 | `og.png` | Link preview image (1200×630) used by X and others. |
 | `og-image.html` | Source for `og.png`. |
@@ -58,6 +59,27 @@ Deploy (static files, no build step on Vercel):
 vercel deploy --prod
 ```
 
+## Usage counts
+
+Two free tools, neither using cookies:
+
+- **Vercel Web Analytics** counts landing page visits, where they came from, countries and devices (the project's Analytics tab).
+- **PostHog** (project "Analytics", EU region, set to discard IP addresses) gets these events through `/relay/` on this site. Each name starts with `kitchen_mode_`.
+
+| Event | Sent when | Properties |
+|---|---|---|
+| `page_viewed` | the landing page loads | `from`: the referring site |
+| `tried` | "Try it" is pressed, or the page opens at `#try` | |
+| `button_clicked` | someone clicks the install button instead of dragging it | |
+| `drag_started` | the install button is picked up | |
+| `drag_ended` | it's let go | `effect`: `none` if the drag was cancelled; anything else means it landed, most likely on the bookmarks bar |
+| `code_copied` | "Copy the code" worked (phone setup) | |
+| `opened` | the bookmarklet opens, on any site | `site`, `found` (whether it found a recipe), `build` (build date) |
+
+The landing page events share one random ID per visit, so they work as a funnel. `opened` gets a new random ID every time, so it counts opens, not people.
+
+Limits: copies installed before 27 Sep 2026 never report, since installed copies don't update. Sites whose security policy blocks outside requests drop the count silently. `opened` on kitchen-mode.vercel.app is "Try it". Nothing is sent when the page is opened from a file.
+
 ## Site support
 
 Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup the bookmarklet uses. Sites that turn away plain requests were loaded in headless Chrome instead.
@@ -70,7 +92,7 @@ Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup
 
 ## Decisions
 
-- **A bookmarklet rather than an extension.** No install, store fee or review, and nothing leaves the page. The costs: it's desktop-first, phone setup means pasting the code into a bookmark by hand, and installed copies never update, so test before sharing a new version.
+- **A bookmarklet rather than an extension.** No install, store fee or review, and nothing leaves the page but an anonymous count. The costs: it's desktop-first, phone setup means pasting the code into a bookmark by hand, and installed copies never update, so test before sharing a new version.
 - **The grip dots, tear line and pan on the install button are drawn by CSS**, so the dragged bookmark is named plain "Kitchen Mode". Chrome always shows its own globe icon for bookmarklets and there's no way to set a different one.
 - **The sample recipe's JSON-LD is only added when someone presses "Try it"**, so Google never reads the landing page as a recipe.
 - **Landing page design: "The Pass".** Each recipe step is an order ticket clipped to the steel rail at a restaurant pass. The bookmarks bar is the rail, and installing means hanging the Kitchen Mode ticket on it. Cream ground, white tickets with a clip and drop shadow, tomato red (#d92d20) for actions, amber (#ffb020) for timers, espresso bands; steel is the only cool colour. Fonts are Archivo condensed for headings, IBM Plex Mono for labels and Atkinson Hyperlegible Next for body text (legibility is the point of the tool). The hero ticket plays through a step the way the real view does. Every text and background pair is at least 4.5:1, or 3:1 for text 24px and up, in light and dark mode.
@@ -83,6 +105,7 @@ Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup
 - The phone setup steps on a real iPhone (Safari) and Android phone (Chrome)
 - Real click tests on each site in the list above (only the data check has been run)
 - The landing page and cook view in Safari and Firefox (the redesign was checked in Chrome only)
+- Whether Safari and Firefox report a drop on the bookmarks bar as anything but `none` in `drag_ended`
 
 ## Ideas
 
