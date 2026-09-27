@@ -71,15 +71,18 @@ Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup
 ## Decisions
 
 - **A bookmarklet rather than an extension.** No install, store fee or review, and nothing leaves the page. The costs: it's desktop-first, phone setup means pasting the code into a bookmark by hand, and installed copies never update, so test before sharing a new version.
-- **The pan emoji on the install button is drawn by CSS**, so the dragged bookmark is named plain "Kitchen Mode". Chrome always shows its own globe icon for bookmarklets and there's no way to set a different one.
+- **The grip dots, tear line and pan on the install button are drawn by CSS**, so the dragged bookmark is named plain "Kitchen Mode". Chrome always shows its own globe icon for bookmarklets and there's no way to set a different one.
 - **The sample recipe's JSON-LD is only added when someone presses "Try it"**, so Google never reads the landing page as a recipe.
-- **Landing page design:** a tablet propped against a tiled splashback, with a live replica of the cook view. Fonts are Young Serif (cookbook feel) and Atkinson Hyperlegible Next (legibility is the point of the tool). The tool itself keeps its own cream and orange palette.
+- **Landing page design: "The Pass".** Each recipe step is an order ticket clipped to the steel rail at a restaurant pass. The bookmarks bar is the rail, and installing means hanging the Kitchen Mode ticket on it. Cream ground, white tickets with a clip and drop shadow, tomato red (#d92d20) for actions, amber (#ffb020) for timers, espresso bands; steel is the only cool colour. Fonts are Archivo condensed for headings, IBM Plex Mono for labels and Atkinson Hyperlegible Next for body text (legibility is the point of the tool). The hero ticket plays through a step the way the real view does. Every text and background pair is at least 4.5:1, or 3:1 for text 24px and up, in light and dark mode.
+- **The tool's palette matches the landing page:** cream background, tomato red for the step counter, progress and buttons, amber chips for running timers with a light amber tint on tappable times, and "You'll need" and the finish screen as white ticket stubs. Labels (title bar, eyebrows, pills, timers, the serves and cooking-time line, key hints) use the system monospace font; the step text and headings are system-ui. Buttons match the landing page: 10px corners, red with a darker red shadow, or an ink outline. There are no web fonts in the tool, because they're unreliable on other sites' pages, and nothing is rotated or torn, because reading comes first. Ringing timers turn red, so the "screen may sleep" warning is an inverted ink pill instead. Dimmed sentences sit at 50–55% opacity so they still reach 3:1.
+- **The tool was restyled before launch, not after**, because installed bookmarklets never update: whatever look ships first is the one early users keep. It also means the ticket on the landing page shows what people actually get.
 - **Name:** kept "Kitchen Mode" because it says what it does. "Recipease" was considered and dropped: it was Jamie Oliver's cookery shop brand, and it sounds identical to "recipes".
 
 ## Not yet tested
 
 - The phone setup steps on a real iPhone (Safari) and Android phone (Chrome)
 - Real click tests on each site in the list above (only the data check has been run)
+- The landing page and cook view in Safari and Firefox (the redesign was checked in Chrome only)
 
 ## Ideas
 
