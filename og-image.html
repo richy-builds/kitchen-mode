@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;700&family=Young+Serif&display=swap">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1200px; height: 630px; overflow: hidden; color: #15302a; font-family: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+    background-color: #cfe0d4; background-image: linear-gradient(#bdd3c4 2px, transparent 2px), linear-gradient(90deg, #bdd3c4 2px, transparent 2px); background-size: 84px 84px; background-position: -1px -1px; }
+  .top { position: absolute; left: 64px; top: 52px; right: 64px; display: flex; justify-content: space-between; align-items: baseline; }
+  .brand { font: 400 30px/1 "Young Serif", Georgia, serif; }
+  .by { font-size: 24px; font-weight: 700; color: #435a51; }
+  h1 { position: absolute; left: 64px; top: 112px; margin: 0; font: 400 70px/1 "Young Serif", Georgia, serif; letter-spacing: -.02em; }
+  .tablet { position: absolute; left: 64px; right: 64px; top: 294px; height: 420px; padding: 14px; background: #1d1f1e; border-radius: 34px; box-shadow: 0 40px 80px -30px rgb(8 28 22 / .6); }
+  .screen { height: 100%; border-radius: 22px; background: #fbf7f0; color: #1f1a14; padding: 34px 48px; font-family: system-ui, -apple-system, sans-serif; display: grid; grid-template-columns: 1fr 300px; gap: 40px; align-items: start; }
+  .eyebrow { font-size: 15px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #c2410c; margin-bottom: 14px; }
+  .step { margin: 0; font-size: 40px; font-weight: 520; line-height: 1.28; letter-spacing: -.005em; }
+  .past { opacity: .3; }
+  .chip { background: #fde4d3; color: #c2410c; font-weight: 650; padding: 0 .28em; border-radius: .3em; white-space: nowrap; }
+  .need { background: #f3ecdf; border-radius: 20px; padding: 22px 24px; margin-top: 30px; }
+  .need ul { list-style: none; margin: 0; padding: 0; }
+  .need li { font-size: 22px; line-height: 1.25; padding: 8px 0; }
+  .need li + li { border-top: 1px solid #e6dccb; }
+</style>
+</head>
+<body>
+  <div class="top"><span class="brand">🍳 Kitchen Mode</span><span class="by">@richyjudge</span></div>
+  <h1>Read the recipe from<br>across the kitchen.</h1>
+  <div class="tablet"><div class="screen">
+    <div>
+      <div class="eyebrow">Step 3 of 5</div>
+      <p class="step">Pour in the chopped tomatoes and stock, then tip in the butter beans. <span class="past">Cook uncovered for <span class="chip">⏱︎ 18–20 mins</span>, stirring occasionally.</span></p>
+    </div>
+    <div class="need">
+      <div class="eyebrow">You’ll need</div>
+      <ul><li><b>400g</b> tin chopped tomatoes</li><li><b>2</b> tins butter beans</li><li><b>300ml</b> vegetable stock</li></ul>
+    </div>
+  </div></div>
+</body>
+</html>
