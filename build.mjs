@@ -151,6 +151,11 @@ const tested = [
   ['Waitrose', 'https://www.waitrose.com/ecom/recipe/creamy-corn-pasta'],
   ['Well Plated', 'https://www.wellplated.com/crockpot-potato-soup-recipe/'],
 ];
+// Shown on the ticket; the rest sit behind "N more sites".
+const featured = new Set(['Allrecipes', 'BBC Good Food', 'BBC Food', 'Bon Appétit', 'Epicurious', 'Food Network',
+  'Jamie Oliver', 'RecipeTin Eats', 'Sally’s Baking Addiction', 'Serious Eats', 'Simply Recipes', 'Tasty']);
+const menuItem = ([name, url]) =>
+  `<li><a href="${url}" target="_blank" rel="noopener"><span>${name}</span><i></i>${icon(TICK, 18, 2.8)}</a></li>`;
 
 const favicon ='data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍳</text></svg>');
@@ -477,6 +482,13 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   .menu a i { flex: 1; margin-top: 8px; border-bottom: 2px dotted var(--rule-strong); }
   .menu a svg { flex: none; color: var(--accent); }
   .menu a:hover span { color: var(--link); text-decoration: underline; }
+  .menu-more { margin: 0; }
+  .menu-more summary { justify-content: flex-start; gap: 10px; min-height: 38px; padding: 0; border: 0; border-radius: 0; font-size: 18px; }
+  .menu-more summary:hover { background: none; }
+  .menu-more summary:hover span { color: var(--link); text-decoration: underline; }
+  .menu-more summary i { flex: 1; margin-top: 8px; border-bottom: 2px dotted var(--rule-strong); }
+  .menu-more summary::after { width: 18px; height: 18px; color: var(--accent); }
+  .menu-more .menu { margin: 0; }
   .t-note { margin-top: 10px; font: 400 12px/16px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .wont { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; font-size: 17px; line-height: 1.4; }
   .wont li { display: flex; gap: 10px; }
@@ -676,8 +688,14 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
           <div class="t-head"><h3 class="vh">Tested and working</h3><span aria-hidden="true">Tested and working</span><span>${testedOn}</span></div>
           <hr class="t-rule">
           <ul class="menu">
-            ${tested.map(([name, url]) => `<li><a href="${url}" target="_blank" rel="noopener"><span>${name}</span><i></i>${icon(TICK, 18, 2.8)}</a></li>`).join('\n            ')}
+            ${tested.filter(([name]) => featured.has(name)).map(menuItem).join('\n            ')}
           </ul>
+          <details class="menu-more">
+            <summary><span>${tested.length - featured.size} more sites</span><i></i></summary>
+            <ul class="menu">
+              ${tested.filter(([name]) => !featured.has(name)).map(menuItem).join('\n              ')}
+            </ul>
+          </details>
           <div class="t-note">Each one opens a recipe to try it on</div>
         </div>
       </div>
