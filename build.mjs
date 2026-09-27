@@ -1,4 +1,5 @@
-// Builds index.html: the Kitchen Mode landing page, with the button to drag onto the bookmarks bar.
+// Builds index.html: the Kitchen Mode landing page, with the button to drag onto the bookmarks bar,
+// and km.js: the same code as a file, for the short phone bookmark to load.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 // Your X handle without the @. Leave empty to keep the credit off the page.
@@ -21,6 +22,12 @@ const source = readFileSync(new URL('./kitchen-mode.js', import.meta.url), 'utf8
   .join('\n');
 
 const href = 'javascript:' + encodeURIComponent(source);
+
+// Phones get a short bookmark that loads km.js (the same code) from this site: pasting 34 KB of code into a
+// phone bookmark didn't survive, and a short one can be read back to check it. It also keeps phones up to date.
+// ES5 and no % or #, so it pastes and runs as written. If the site blocks the script, it says so.
+const loader = `javascript:(function(){var s=document.createElement('script');s.src='${SITE_URL}/km.js';` +
+  `s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()`;
 
 // Picture for the sample recipe: a bowl of stew on a cream tablecloth, in the page's colours.
 const bowl = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
@@ -431,7 +438,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   .steps > li::before { content: counter(step); flex: none; width: 40px; font: 800 44px/.9 var(--display); font-stretch: 72%; color: var(--accent); }
   .steps .bookmarklet { margin-top: 12px; }
 
-  details { margin-top: 28px; }
+  details { margin-top: 28px; scroll-margin-top: 120px; }
   summary { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 60px; padding: 10px 22px; border: 2px solid var(--ink); border-radius: 10px; font-size: 17px; font-weight: 700; line-height: 1.3; cursor: pointer; list-style: none; }
   summary:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
   summary::-webkit-details-marker { display: none; }
@@ -442,6 +449,14 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   .phone h3 { margin: 18px 0 8px; font-size: 18px; }
   .phone ol { margin: 0; padding-left: 1.3em; }
   .phone li { margin-bottom: 8px; }
+  .phone code, .test-cue code { font: 600 .9em var(--mono); }
+  /* The whole phone bookmark, so people can check what they pasted, or copy it by hand if the button can't */
+  .phone pre { margin: 0 0 16px; padding: 12px 14px; background: var(--ticket); border: 1px solid var(--rule-strong); border-radius: 10px; font: 400 13px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; user-select: all; -webkit-user-select: all; }
+
+  /* Shown on the test recipe (#test): what to do next, then that it worked */
+  .test-cue { position: fixed; inset: 0 0 auto; z-index: 10; padding: 14px 16px; background: var(--espresso); color: var(--on-espresso); font: 700 18px/1.4 var(--body); text-align: center; box-shadow: 0 10px 30px -10px rgb(0 0 0 / .5); }
+  .test-cue a { color: var(--amber); }
+  .test-cue .done { color: var(--amber); }
 
   .drawing { margin: 0; }
   .frame { overflow: hidden; border: 1px solid var(--rule-strong); border-radius: 16px; background: var(--ground); box-shadow: 0 30px 60px -30px var(--shadow); }
@@ -571,6 +586,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
+<div class="test-cue" id="test-cue" role="status" hidden></div>
 <div class="drop-cue" id="drop-cue" hidden>${icon(UP, 22, 2.8)} Drop it on your bookmarks bar, just above this page ${icon(UP, 22, 2.8)}</div>
 <header class="top wrap">
   <a class="brand" href="./">${pan(26)}Kitchen Mode</a>
@@ -598,7 +614,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
       <p><strong>Drag the Kitchen Mode ticket up onto your bookmarks bar.</strong> That’s the whole install. No bar? Press <span class="combo"><kbd data-mod>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span>.</p>
     </div>
     <p class="tip for-mouse" id="hint" aria-live="polite"></p>
-    <p class="phone-note for-touch">Phones have no bookmarks bar, so you paste the code into a bookmark. It takes a minute.</p>
+    <p class="phone-note for-touch">Phones and tablets have no bookmarks bar, so you paste a short code into a bookmark. It takes a couple of minutes.</p>
   </div>
 
   <figure class="pass" role="img" aria-label="Kitchen Mode showing step 3 of a stew recipe on an order ticket clipped to a steel rail: one sentence in large type, the ingredients it needs, and a running timer.">
@@ -643,36 +659,40 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 <section class="section" id="setup">
   <div class="split wrap">
     <div class="copy">
-      <p class="kicker"><span class="tag">Set it up</span><span>Once, on a computer</span></p>
+      <p class="kicker"><span class="tag">Set it up</span><span class="for-mouse">Once, on a computer</span><span class="for-touch">Once, on this phone or tablet</span></p>
       <h2>Hang it on the rail.</h2>
-      <p class="section-lede">Your bookmarks bar is the rail. Kitchen Mode is the ticket you hang on it, ready for every recipe after.</p>
-      <ol class="steps">
+      <p class="section-lede for-mouse">Your bookmarks bar is the rail. Kitchen Mode is the ticket you hang on it, ready for every recipe after.</p>
+      <p class="section-lede for-touch">Phones and tablets have no bookmarks bar to drag it to, so it goes in your bookmarks instead. It takes a couple of minutes, once.</p>
+      <ol class="steps for-mouse">
         <li><div><strong>Show your bookmarks bar.</strong> Press <span class="combo"><kbd>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span> on a Mac, or <span class="combo"><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span> on Windows. Chrome, Edge, Brave, Safari and Firefox all have one.</div></li>
         <li><div><strong>Drag this ticket up onto the bar.</strong><br><a class="bookmarklet compact" href="${href}" data-tip="tip">Kitchen Mode</a><p class="tip" id="tip" aria-live="polite"></p></div></li>
-        <li><div><strong>Open a recipe and click Kitchen Mode on the bar.</strong> Click it again, or press <kbd>Esc</kbd>, to close it.</div></li>
+        <li><div><strong>Open a recipe and click Kitchen Mode on the bar.</strong> Click it again, or press <kbd>Esc</kbd>, to close it. <a href="#test">Test it on the sample recipe</a>.</div></li>
       </ol>
       <details id="phone">
         <summary>Setting it up on a phone or tablet</summary>
         <div class="phone">
-          <p>Phones don’t have a bookmarks bar, so you save Kitchen Mode as a bookmark and paste its code in yourself. You only do this once.</p>
+          <p>You save Kitchen Mode as a bookmark whose address is this short piece of code:</p>
+          <pre id="code">${loader.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>
           <p><button class="button small" type="button" id="copy">Copy the code</button></p>
-          <h3>iPhone and iPad (Safari)</h3>
-          <ol>
-            <li>Tap <strong>Copy the code</strong>.</li>
-            <li>Bookmark this page: tap Share, then <strong>Add Bookmark</strong>. Name it Kitchen Mode.</li>
-            <li>Open your bookmarks, tap <strong>Edit</strong>, then tap Kitchen Mode. Delete the address and paste the code in its place.</li>
-            <li>On a recipe, open your bookmarks and tap Kitchen Mode.</li>
-          </ol>
           <h3>Android (Chrome)</h3>
           <ol>
             <li>Tap <strong>Copy the code</strong>.</li>
-            <li>Bookmark this page with the star in the ⋮ menu.</li>
-            <li>Open your bookmarks and edit the new one. Name it Kitchen Mode and paste the code into the URL box.</li>
-            <li>On a recipe, type Kitchen Mode in the address bar and tap the bookmark that appears.</li>
+            <li>Tap ⋮, then the star, to bookmark this page. Tap <strong>Edit</strong> on the message that pops up. (Missed it? Tap ⋮, then Bookmarks, then ⋮ next to Kitchen Mode, then Edit.)</li>
+            <li>Change the name to <code>kitchenmode</code>, as one word. In the URL box, press and hold, tap <strong>Select all</strong>, then <strong>Paste</strong>. The URL should now start with <code>javascript:</code>. Go back, and it saves.</li>
+            <li><a href="#test">Open the test recipe</a>, tap the address bar, type <code>kitchenmode</code>, and tap the suggestion with the star. Not the one with a clock: that’s this website from your history.</li>
           </ol>
+          <p>These steps are for Chrome. If you normally use Samsung Internet or another browser, open this page in Chrome to set it up.</p>
+          <h3>iPhone and iPad (Safari)</h3>
+          <ol>
+            <li>Tap <strong>Copy the code</strong>.</li>
+            <li>Tap Share, then <strong>Add Bookmark</strong>, then <strong>Save</strong>.</li>
+            <li>Open your bookmarks (the book icon), tap <strong>Edit</strong>, then tap Kitchen Mode. Tap the address, tap ⓧ to clear it, then press and hold and tap <strong>Paste</strong>. It should start with <code>javascript:</code>. Tap <strong>Done</strong>.</li>
+            <li><a href="#test">Open the test recipe</a>, then open your bookmarks and tap Kitchen Mode.</li>
+          </ol>
+          <p>Once the test works, use it the same way on any recipe. This bookmark loads Kitchen Mode from this site each time, so it stays up to date.</p>
         </div>
       </details>
-      <p class="note">Bookmarks don’t update themselves. To get a newer version, drag the ticket onto your bar again and delete the old one.</p>
+      <p class="note for-mouse">Bookmarks on a computer don’t update themselves. To get a newer version, drag the ticket onto your bar again and delete the old one.</p>
     </div>
     <figure class="drawing for-mouse">
       <div class="frame">${drawing}</div>
@@ -773,19 +793,50 @@ function runKitchenMode() {
 ${source.replace(/<\/script/gi, '<\\/script')}
 }
 
+function addSample() {
+  if (document.getElementById('sample-recipe')) return;
+  var s = document.createElement('script');
+  s.type = 'application/ld+json';
+  s.id = 'sample-recipe';
+  s.textContent = JSON.stringify(SAMPLE);
+  document.head.append(s);
+}
+var trying = false;
 function tryIt() {
   count('tried');
-  if (!document.getElementById('sample-recipe')) {
-    var s = document.createElement('script');
-    s.type = 'application/ld+json';
-    s.id = 'sample-recipe';
-    s.textContent = JSON.stringify(SAMPLE);
-    document.head.append(s);
-  }
+  addSample();
+  trying = true;
   runKitchenMode();
 }
 document.querySelectorAll('[data-try]').forEach(function (b) { b.addEventListener('click', tryIt); });
 if (location.hash === '#try') tryIt();
+
+// The test recipe (#test): the sample recipe is on the page, so the bookmark someone just made opens it, and the
+// banner says it worked. Like #try, Google never sees it, since it only reads the page without the #.
+var testCue = document.getElementById('test-cue'), testing = false;
+function startTest() {
+  if (testing || location.hash !== '#test') return;
+  testing = true;
+  count('test_opened');
+  addSample();
+  var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  testCue.innerHTML = matchMedia('(pointer: coarse)').matches
+    ? (ios ? 'Test recipe ready. Now open your bookmarks and tap Kitchen Mode.'
+           : 'Test recipe ready. Now tap the address bar, type <code>kitchenmode</code>, and tap the suggestion with the star.') +
+      ' <a href="#phone">Nothing happened?</a>'
+    : 'Test recipe ready. Now click Kitchen Mode on your bookmarks bar.';
+  testCue.hidden = false;
+  // Kitchen Mode sets window.__kitchenMode while it's open. Opened by anything but "Try it" means the bookmark works.
+  var check = setInterval(function () {
+    if (!window.__kitchenMode) { trying = false; return; }
+    if (trying) return;
+    clearInterval(check);
+    count('test_passed', { loader: !!document.querySelector('script[src$="/km.js"]') });
+    testCue.innerHTML = '<span class="done">It works.</span> Close it, then use it the same way on any recipe.';
+  }, 400);
+}
+startTest();
+addEventListener('hashchange', startTest);
 
 // The button only works from the bookmarks bar, so a click here explains how to drag it instead,
 // and a banner points up at the bar for as long as the button is being dragged.
@@ -814,21 +865,25 @@ if (!/Mac/.test(navigator.platform)) document.querySelectorAll('[data-mod]').for
 if (matchMedia('(pointer: coarse)').matches) document.getElementById('phone').open = true;
 
 document.getElementById('copy').addEventListener('click', function () {
-  var btn = this, code = document.querySelector('.bookmarklet').getAttribute('href');
+  var btn = this, box = document.getElementById('code'), code = box.textContent;
   function done() {
     count('code_copied');
     btn.textContent = 'Code copied';
     setTimeout(function () { btn.textContent = 'Copy the code'; }, 2500);
   }
+  // If neither way of copying works, select the code so a press and hold can copy it
   function fallback() {
-    var t = document.createElement('textarea');
+    var t = document.createElement('textarea'), copied = false;
     t.value = code;
     t.setAttribute('readonly', '');
     t.style.cssText = 'position:fixed;opacity:0';
     document.body.append(t);
     t.select();
-    try { if (document.execCommand('copy')) done(); } catch (e) {}
+    try { copied = document.execCommand('copy'); } catch (e) {}
     t.remove();
+    if (copied) return done();
+    getSelection().selectAllChildren(box);
+    btn.textContent = 'Press and hold the code to copy it';
   }
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(code).then(done, fallback);
   else fallback();
@@ -878,4 +933,6 @@ document.getElementById('copy').addEventListener('click', function () {
 `;
 
 writeFileSync(new URL('./index.html', import.meta.url), page);
+writeFileSync(new URL('./km.js', import.meta.url), source + '\n');
 console.log(`index.html written (bookmarklet ${(href.length / 1024).toFixed(1)} KB, page ${(page.length / 1024).toFixed(1)} KB)`);
+console.log(`km.js written (${(source.length / 1024).toFixed(1)} KB, loaded by the ${loader.length}-character phone bookmark)`);

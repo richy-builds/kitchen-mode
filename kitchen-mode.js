@@ -4,6 +4,8 @@
  */
 (() => {
   if (window.__kitchenMode) { window.__kitchenMode.close(); return; }
+  // Only set while km.js runs as a script file, which only the phone bookmark does.
+  const loader = !!document.currentScript?.src;
 
   const h = (tag, props = {}, ...kids) => {
     const el = document.createElement(tag);
@@ -106,14 +108,15 @@
   const recipe = findRecipe();
   const steps = recipe ? getSteps(recipe.recipeInstructions).map(s => ({ ...s, sentences: splitSentences(s.text) })) : [];
 
-  // One anonymous count per open: the site's name, whether it found a recipe, and the build date, since
-  // installed copies never update. No page address and no ID. See "Usage counts" in the README.
+  // One anonymous count per open: the site's name, whether it found a recipe, the build date (installed copies
+  // never update) and whether the phone bookmark loaded it from km.js. No page address and no ID. See "Usage counts" in the README.
   try {
     if (location.hostname) fetch('%COUNT_URL%', {
       method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
       body: JSON.stringify({
         api_key: '%POSTHOG_KEY%', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
-        properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '%BUILD%', $process_person_profile: false },
+        properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '%BUILD%', loader,
+          $process_person_profile: false },
       }),
     }).catch(() => {});
   } catch {}
