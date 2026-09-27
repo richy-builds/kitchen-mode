@@ -108,7 +108,9 @@
   if (!steps.length) { toast("Kitchen Mode couldn't find a recipe on this page."); return; }
 
   const title = clean(recipe.name) || document.title;
-  const ingredients = [].concat(recipe.recipeIngredient || recipe.ingredients || []).map(clean).filter(Boolean);
+  // Some sites (Barefoot Contessa) pack the whole list into one newline-separated string.
+  const ingredients = [].concat(recipe.recipeIngredient || recipe.ingredients || [])
+    .flatMap(s => String(s ?? '').split(/\n+/)).map(clean).filter(Boolean);
   const yieldText = String([].concat(recipe.recipeYield || [])[0] ?? '').trim();
   const [prep, cookTime, total] = [recipe.prepTime, recipe.cookTime, recipe.totalTime].map(duration);
   const meta = [

@@ -60,11 +60,13 @@ vercel deploy --prod
 
 ## Site support
 
-Checked on 27 Sep 2026 by fetching a recipe page and running the same data lookup the bookmarklet uses:
+Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup the bookmarklet uses. Sites that turn away plain requests were loaded in headless Chrome instead.
 
-- **Publish the data** (each links to the recipe that was checked; the list lives in `tested` in `build.mjs`): [BBC Good Food](https://www.bbcgoodfood.com/recipes/bacon-mushroom-risotto), [BBC Food](https://www.bbc.co.uk/food/recipes/easy_chocolate_cake_31070), [Bon Appétit](https://www.bonappetit.com/recipe/bas-best-chocolate-chip-cookies), [Delish](https://www.delish.com/cooking/recipe-ideas/a19636089/creamy-tuscan-chicken-recipe/), [Jamie Oliver](https://www.jamieoliver.com/recipes/chicken/chicken-tikka-masala/), [King Arthur Baking](https://www.kingarthurbaking.com/recipes/classic-chocolate-chip-cookies-recipe), [Pinch of Yum](https://pinchofyum.com/the-best-soft-chocolate-chip-cookies), [RecipeTin Eats](https://www.recipetineats.com/chicken-chasseur/)
-- **Blocked the automated check** (bot protection, so unknown rather than unsupported): Allrecipes, Serious Eats, Simply Recipes, Budget Bytes, Sally's Baking Addiction, Taste of Home
-- **Left off the landing page on purpose:** NYT Cooking publishes the data, but the recipes are paywalled
+- **Publish the data (73 sites):** the list, with the recipe checked on each, lives in `tested` in `build.mjs`.
+- **Don't publish usable data:** Nigella, Mary Berry, Smitten Kitchen, Hairy Bikers, Rick Stein and Inspired Taste publish none; Gordon Ramsay publishes recipes without their steps
+- **Blocked even headless Chrome** (bot protection, so unknown rather than unsupported): Taste of Home, The Kitchn, The Woks of Life, Riverford, Coles
+- **No recipe page found to check:** EatingWell, Skinnytaste, Tesco Real Food, Donna Hay, Ambitious Kitchen (the crawl only reached collection pages)
+- **Left off the landing page on purpose:** NYT Cooking publishes the data, but the recipes are paywalled. Big non-English sites (Marmiton, Chefkoch, Cookpad) weren't checked, since the sentence and timer rules are written for English.
 
 ## Decisions
 
