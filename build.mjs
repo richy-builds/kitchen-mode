@@ -678,8 +678,8 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
           <ol>
             <li>Tap <strong>Copy the code</strong>.</li>
             <li>Tap ⋮, then the star, to bookmark this page. Tap <strong>Edit</strong> on the message that pops up. (Missed it? Tap ⋮, then Bookmarks, then ⋮ next to Kitchen Mode, then Edit.)</li>
-            <li>Change the name to <code>kitchenmode</code>, as one word. In the URL box, press and hold, tap <strong>Select all</strong>, then <strong>Paste</strong>. The URL should now start with <code>javascript:</code>. Go back, and it saves.</li>
-            <li><a href="#test">Open the test recipe</a>, tap the address bar, type <code>kitchenmode</code>, and tap the suggestion with the star. Not the one with a clock: that’s this website from your history.</li>
+            <li>Change the name to <code>kitchenmode</code>, as one word. In the URL box, press and hold, tap <strong>Select all</strong>, then <strong>Paste</strong>. The URL should now start with <code>javascript:</code>. Go back to this page, and it saves.</li>
+            <li><a href="#test">Open the test recipe</a>, tap the address bar, type <code>kitchenmode</code>, and tap the suggestion with the star. Not the one with a clock: that’s this website from your history. Always open it this way. Tapping it in your bookmarks list does nothing: Chrome on Android only runs it from the address bar.</li>
           </ol>
           <p>These steps are for Chrome. If you normally use Samsung Internet or another browser, open this page in Chrome to set it up.</p>
           <h3>iPhone and iPad (Safari)</h3>
@@ -822,7 +822,7 @@ function startTest() {
   var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   testCue.innerHTML = matchMedia('(pointer: coarse)').matches
     ? (ios ? 'Test recipe ready. Now open your bookmarks and tap Kitchen Mode.'
-           : 'Test recipe ready. Now tap the address bar, type <code>kitchenmode</code>, and tap the suggestion with the star.') +
+           : 'Test recipe ready. Now tap the address bar (not your bookmarks list, where it does nothing), type <code>kitchenmode</code>, and tap the suggestion with the star.') +
       ' <a href="#phone">Nothing happened?</a>'
     : 'Test recipe ready. Now click Kitchen Mode on your bookmarks bar.';
   testCue.hidden = false;
