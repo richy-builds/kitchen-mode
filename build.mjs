@@ -450,6 +450,10 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   .phone ol { margin: 0; padding-left: 1.3em; }
   .phone li { margin-bottom: 8px; }
   .phone code, .test-cue code { font: 600 .9em var(--mono); }
+  /* Screenshot of Chrome's address bar (Pixel emulator, Chrome 145), with a ring around the row to tap */
+  .phone .shot { position: relative; max-width: 360px; margin: 12px 0 20px; }
+  .phone .shot img { display: block; width: 100%; height: auto; border: 1px solid var(--rule-strong); border-radius: 12px; }
+  .phone .shot .ring { position: absolute; inset: 71% 0.5% 1% 0.5%; border: 3px solid var(--accent); border-radius: 14px; }
   /* The whole phone bookmark, so people can check what they pasted, or copy it by hand if the button can't */
   .phone pre { margin: 0 0 16px; padding: 12px 14px; background: var(--ticket); border: 1px solid var(--rule-strong); border-radius: 10px; font: 400 13px/1.5 var(--mono); white-space: pre-wrap; word-break: break-all; user-select: all; -webkit-user-select: all; }
 
@@ -677,11 +681,19 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
           <h3>Android (Chrome)</h3>
           <ol>
             <li>Tap <strong>Copy the code</strong>.</li>
-            <li>Tap ⋮, then the star, to bookmark this page. Tap <strong>Edit</strong> on the message that pops up. (Missed it? Tap ⋮, then Bookmarks, then ⋮ next to Kitchen Mode, then Edit.)</li>
-            <li>Change the name to <code>kitchenmode</code>, as one word. In the URL box, press and hold, tap <strong>Select all</strong>, then <strong>Paste</strong>. The URL should now start with <code>javascript:</code>. Go back to this page, and it saves.</li>
-            <li><a href="#test">Open the test recipe</a>, tap the address bar, type <code>kitchenmode</code>, and tap the suggestion with the star. Not the one with a clock: that’s this website from your history. Always open it this way. Tapping it in your bookmarks list does nothing: Chrome on Android only runs it from the address bar.</li>
+            <li>Tap ⋮, then the star, to bookmark this page. Then tap the message that pops up at the bottom (<strong>Bookmark saved</strong>, or <strong>Edit</strong>) before it goes. (Missed it? Tap ⋮, then Bookmarks, then Mobile bookmarks, then ⋮ next to Kitchen Mode, then Edit.)</li>
+            <li>Change the name to <code>kitchenmode</code>, as one word. In the URL box, press and hold until the whole address is highlighted (tap <strong>Select all</strong> if it isn’t), then tap <strong>Paste</strong>. The URL should now start with <code>javascript:</code>. Go back to this page, and it saves.</li>
+            <li><a href="#test">Open the test recipe</a>, tap the address bar and type <code>kitchenmode:</code> with a colon at the end, then tap the suggestion with the star. The colon stops Chrome filling the list with searches, which push the star down behind the keyboard. Always open it this way: tapping it in your bookmarks list does nothing, since Chrome on Android only runs it from the address bar.
+              <figure class="shot">
+                <picture>
+                  <source srcset="android-address-bar-dark.png" media="(prefers-color-scheme: dark)">
+                  <img src="android-address-bar.png" width="720" height="400" loading="lazy" alt="Chrome’s address bar with kitchenmode: typed in. Below it, three suggestions; the third, circled, is kitchenmode from Mobile bookmarks, with a star.">
+                </picture>
+                <span class="ring" aria-hidden="true"></span>
+              </figure>
+            </li>
           </ol>
-          <p>These steps are for Chrome. If you normally use Samsung Internet or another browser, open this page in Chrome to set it up.</p>
+          <p>These steps are for Chrome. If you normally use Samsung Internet or another browser, open this page in Chrome to set it up. Pages opened from another app, like Gmail, show an ✕ at the top left, and their address bar won’t let you type: tap ⋮, then <strong>Open in Chrome browser</strong>, first. That goes for recipes too.</p>
           <h3>iPhone and iPad (Safari)</h3>
           <ol>
             <li>Tap <strong>Copy the code</strong>.</li>
@@ -822,7 +834,7 @@ function startTest() {
   var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   testCue.innerHTML = matchMedia('(pointer: coarse)').matches
     ? (ios ? 'Test recipe ready. Now open your bookmarks and tap Kitchen Mode.'
-           : 'Test recipe ready. Now tap the address bar (not your bookmarks list, where it does nothing), type <code>kitchenmode</code>, and tap the suggestion with the star.') +
+           : 'Test recipe ready. Now tap the address bar (not your bookmarks list, where it does nothing), type <code>kitchenmode:</code> with the colon, and tap the suggestion with the star.') +
       ' <a href="#phone">Nothing happened?</a>'
     : 'Test recipe ready. Now click Kitchen Mode on your bookmarks bar.';
   testCue.hidden = false;

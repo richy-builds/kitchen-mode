@@ -93,7 +93,7 @@ if (location.hostname) fetch('https://kitchen-mode.vercel.app/relay/i/v0/e/', {
 method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
 body: JSON.stringify({
 api_key: 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
-properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-09-27', loader,
+properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-09-28', loader,
 $process_person_profile: false },
 }),
 }).catch(() => {});
@@ -400,6 +400,8 @@ document.documentElement.style.overflow = 'hidden';
 document.activeElement?.blur?.();
 window.addEventListener('keydown', onKey, true);
 document.addEventListener('visibilitychange', onVisible);
+const watcher = window.CloseWatcher ? new CloseWatcher() : null;
+if (watcher) watcher.onclose = () => close();
 getLock();
 render();
 const close = () => {
@@ -408,6 +410,7 @@ lock?.release().catch(() => {});
 clearInterval(tickId);
 window.removeEventListener('keydown', onKey, true);
 document.removeEventListener('visibilitychange', onVisible);
+watcher?.destroy();
 host.remove();
 document.documentElement.style.overflow = prevOverflow;
 document.title = origTitle;

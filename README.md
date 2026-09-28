@@ -27,6 +27,7 @@ Recipe sites publish a structured copy of each recipe ([schema.org Recipe](https
 - Times are found with a regex; ranges start the timer at the low end, so you check early rather than late.
 - The view is mounted in a shadow DOM, so the recipe site's CSS can't interfere.
 - The screen stays on through the Screen Wake Lock API, re-requested when the tab becomes visible again.
+- On Android, the back gesture closes the view instead of leaving the recipe page (`CloseWatcher`, Chrome only).
 
 ## Files
 
@@ -39,6 +40,7 @@ Recipe sites publish a structured copy of each recipe ([schema.org Recipe](https
 | `index.html` | The generated landing page. Don't edit by hand. |
 | `og.png` | Link preview image (1200×630) used by X and others. |
 | `og-image.html` | Source for `og.png`. |
+| `android-address-bar.png`, `android-address-bar-dark.png` | Chrome's address bar with `kitchenmode:` typed, shown in the last Android setup step (light and dark). Taken on the Android emulator, cropped to 720×400. |
 
 ## Working on it
 
@@ -53,6 +55,15 @@ Regenerate the preview image after changing `og-image.html`:
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
   --virtual-time-budget=4000 --window-size=1200,630 --screenshot="$PWD/og.png" "file://$PWD/og-image.html"
 ```
+
+Test on Android in the emulator (a Pixel 8 with Android 17 and Chrome 145, from the Play Store image, so it's the real Chrome for Android):
+
+```sh
+~/Library/Android/sdk/emulator/emulator -avd kitchen_pixel &   # boots in about 30 s; close the window to stop it
+adb reverse tcp:8765 tcp:8765 && python3 -m http.server 8765  # its Chrome can then open http://localhost:8765
+```
+
+`chrome://inspect` in Chrome on the Mac attaches DevTools to the emulator's tabs. `adb` is in `~/Library/Android/sdk/platform-tools`. It was installed with Homebrew (`openjdk@21`, `android-commandlinetools`), then `sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"` and `avdmanager create avd -n kitchen_pixel -d pixel_8`. It isn't signed in to Google, so Chrome doesn't update and the Play Store can't install other browsers.
 
 Deploy (static files, no build step on Vercel):
 
@@ -98,6 +109,9 @@ Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup
 - **A bookmarklet rather than an extension.** No install, store fee or review, and nothing leaves the page but an anonymous count. The costs: it's desktop-first, phone setup means pasting code into a bookmark by hand, and bookmarks dragged on a computer never update, so test before sharing a new version.
 - **Phones get a short loader bookmark; computers keep the full code.** The first phone users couldn't get the 34 KB bookmark to run: 8 "Copy the code" presses on 27 Sep and no phone opens. So phones now paste a 224-character bookmark that loads `km.js` from this site. It's short enough to check by eye, it always runs the current build, and if the script can't load it says so instead of doing nothing. The cost: each open fetches `km.js` from this site (Vercel's default `max-age=0, must-revalidate`, so a quick revalidation), and sites whose security policy only allows scripts from listed hosts would block it (none of the 50 listed sites that answered a plain request do). Computers keep the full-code drag, which works; switching them too would bring updates to everyone.
 - **Setup ends with a test.** The last phone step opens the test recipe (`#test`), which puts the sample recipe on the page and shows a banner saying what to do, then "It works" once a bookmark opens it. People find out at once, with the steps still in front of them. Android steps name the bookmark `kitchenmode` so it's the only address-bar match: the landing page's title is also "Kitchen Mode", and the history entry for it outranks the bookmark. Chrome on Android does nothing when a code bookmark is tapped in the bookmarks list and only runs it from an address-bar suggestion, so the last Android step and the test banner say so. The first real Android test, on 27 Sep 2026, tried the bookmarks menu first. Touch screens (including tablets, whose Chrome sends a desktop user agent) get only the phone steps, since links can't be dragged to a bookmarks bar there.
+- **Android users type `kitchenmode:`, with a colon.** Chrome on Android lists Google's search suggestions first and puts bookmarks after as many of them as fit on screen. With plain `kitchenmode`, the star came ninth, half hidden behind the keyboard, under "kitchen modern" and the like (Chrome 145 on the emulator, 28 Sep 2026). Chrome doesn't send address-like input (`word:`) to Google for suggestions, so with the colon the list is just the typed text twice, then the star, third. Other names didn't help: kmode, kmkm, cookmode, zzkm and others still drew about eight suggestions each, and those vary by country; `kitchenmode/` left six rows. If Chrome ever does suggest searches for it, the star is still in the list, just lower. The step shows a screenshot of that list, light and dark, with the row to tap ringed.
+- **Android's back gesture closes Kitchen Mode.** Back used to leave the recipe page, which is easy to do by accident when swiping from the screen edge to go back a step. `CloseWatcher` (Chrome 120 and up) exists for this and leaves the site's history alone. `history.pushState` would work in more browsers, but recipe sites that route with the History API could react to it. Browsers without `CloseWatcher` behave as before.
+- **Pages opened from other apps need Chrome itself.** Links opened from another app often open in a Custom Tab. It has the bookmark star, but tapping its address bar shows site info instead of letting you type, so Kitchen Mode can't be opened there. The Android steps say to tap ⋮, then Open in Chrome browser, and that the same goes for recipes.
 - **The grip dots, tear line and pan on the install button are drawn by CSS**, so the dragged bookmark is named plain "Kitchen Mode". Chrome always shows its own globe icon for bookmarklets and there's no way to set a different one.
 - **The sample recipe's JSON-LD is only added when someone presses "Try it"**, so Google never reads the landing page as a recipe.
 - **Landing page design: "The Pass".** Each recipe step is an order ticket clipped to the steel rail at a restaurant pass. The bookmarks bar is the rail, and installing means hanging the Kitchen Mode ticket on it. Cream ground, white tickets with a clip and drop shadow, tomato red (#d92d20) for actions, amber (#ffb020) for timers, espresso bands; steel is the only cool colour. Fonts are Archivo condensed for headings, IBM Plex Mono for labels and Atkinson Hyperlegible Next for body text (legibility is the point of the tool). The hero ticket plays through a step the way the real view does. Every text and background pair is at least 4.5:1, or 3:1 for text 24px and up, in light and dark mode.
@@ -107,14 +121,14 @@ Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup
 
 ## Not yet tested
 
-- The phone setup steps on a real iPhone (Safari). Checked on 27 Sep 2026 in headless Chrome emulating an Android phone and tablet, with the bookmark run the way the browser runs one: the phone bookmark loads `km.js` and opens the test recipe, "It works" shows for a bookmark but not for "Try it", tapping again closes it, and a failed load shows its message. Checked the same day on a real Android phone (Chrome): typing `kitchenmode` in the address bar and tapping the suggestion with the star opens the test recipe, and tapping the bookmark in the bookmarks menu does nothing. Not checked: anything on iOS.
+- The phone setup steps on a real iPhone (Safari). Checked on 27 Sep 2026 in headless Chrome emulating an Android phone and tablet, with the bookmark run the way the browser runs one: the phone bookmark loads `km.js` and opens the test recipe, "It works" shows for a bookmark but not for "Try it", tapping again closes it, and a failed load shows its message. Checked the same day on a real Android phone (Chrome): typing `kitchenmode` in the address bar and tapping the suggestion with the star opens the test recipe, and tapping the bookmark in the bookmarks menu does nothing. Checked on 28 Sep 2026 in the Android emulator (Pixel 8, Android 17, Chrome 145) by following the Android steps as written: the message after bookmarking said "Bookmark saved", with no Edit button, and went after a few seconds (tapping it opens the editor); pressing and holding the URL highlighted all of it, with no Select all; `kitchenmode:` put the star third and opened the test recipe; the bookmarks list still did nothing. The back gesture was checked on BBC Good Food with the new `km.js` run through DevTools: it closes Kitchen Mode, and the next back leaves the page as normal; Esc and the ✕ also leave back working normally. Not checked: anything on iOS; Samsung Internet and Firefox on Android (the emulator needs a Google account to install them); in-app browsers like Instagram's.
 - Real click tests on most sites in the list above. The phone bookmark was run the same way on 16 (the 12 featured, plus Budget Bytes, Delish, Minimalist Baker and Pinch of Yum) and opened with the recipe on all of them, including BBC Food despite its strict security policy. The rest have only had the data check.
 - The landing page and cook view in Safari and Firefox (the redesign was checked in Chrome only)
 - Whether any browser reports a drop on the bookmarks bar as anything but `none` in `drag_ended`: all 11 drags on 27 Sep 2026 reported `none`, so it may not tell a landed drop from a cancelled one even in Chrome
 
 ## Ideas
 
-- A mobile web version: paste a recipe link and get the cook view (needs a small server function, since browsers can't read other sites' pages), with shareable links per recipe
+- A mobile web version: paste a recipe link and get the cook view (needs a small server function, since browsers can't read other sites' pages), with shareable links per recipe. Made installable with a `share_target` in its manifest, it would appear in Android's share sheet, including in apps where a bookmark can't run, and setup would be one tap. The share sheet only passes the link, so the server has to fetch the page, which breaks the "never the page address" promise. On 28 Sep 2026 a plain fetch from a home connection found the recipe on 58 of the 73 tested sites at best: 54 with an honest `KitchenMode/1.0` user agent, and 48 posing as Chrome, since Cloudflare challenged the fake Chrome on 10 sites that let the honest one through. Allrecipes and the other 6 Dotdash Meredith sites answer any non-browser with a 402; Cloudflare, rate limits or a captcha stopped 7 more, and Joshua Weissman's fetched page has no steps in its data. A server's datacenter address would likely do worse, so the bookmark would stay as the fallback. Not yet measured from Vercel.
 - Scale servings ("serves 4" to 2), rewriting quantities including fractions
 - Read the current step aloud, and voice "next"
 - Give computers the loader bookmark too, so updates reach everyone

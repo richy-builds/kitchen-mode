@@ -446,6 +446,10 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
   document.activeElement?.blur?.();
   window.addEventListener('keydown', onKey, true);
   document.addEventListener('visibilitychange', onVisible);
+  // Android's back gesture closes Kitchen Mode instead of leaving the recipe page.
+  // CloseWatcher is Chrome 120+ only; unlike pushState it leaves the site's own history alone.
+  const watcher = window.CloseWatcher ? new CloseWatcher() : null;
+  if (watcher) watcher.onclose = () => close();
   getLock();
   render();
 
@@ -455,6 +459,7 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
     clearInterval(tickId);
     window.removeEventListener('keydown', onKey, true);
     document.removeEventListener('visibilitychange', onVisible);
+    watcher?.destroy();
     host.remove();
     document.documentElement.style.overflow = prevOverflow;
     document.title = origTitle;
