@@ -75,7 +75,7 @@ const sample = {
     '300ml vegetable stock',
     '100g spinach',
     '1 lemon',
-    'Crusty bread, to serve',
+    'Crusty bread or cooked rice, to serve',
   ],
   recipeInstructions: [
     'Heat the oil in a large, deep pan over a medium heat. Add the onion with a pinch of salt and cook for 8–10 mins, stirring now and then, until soft and golden.',

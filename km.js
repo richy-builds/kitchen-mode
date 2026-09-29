@@ -139,7 +139,9 @@ return ingredients.filter((_, i) => matchKeys[i].some(k => new RegExp('\\b' + k)
 };
 const READY = 'cooked|cooled|chilled|softened|melted|toasted|soaked|marinated|boiled|leftover|defrosted|thawed|room temperature';
 const READY_RE = new RegExp(`\\b(?:${READY})\\b(?! sesame oil)`, 'i');
-const USES_RE = new RegExp(`\\b(?:the|your|some|leftover)\\s+(?:[a-z-]+\\s+)?(?:${READY})\\s+([a-z-]+)`, 'gi');
+const NEXT = '(?!(?:the|a|an|and|or|but|so|is|are|was|were|will|should|can|has|have|it|that|which|if|when|while|with|to|into|in|on|onto|over|of|off|up|out|by|for|from|at|as|then|until|before|after|back|through|together)\\b)';
+const USES_RE = new RegExp(`\\b(?:the|your|some|leftover)\\s+(?:[a-z-]+\\s+)?(?:${READY})\\s+(?!sesame oil)` +
+`(${NEXT}[a-z-]+(?:\\s+${NEXT}(?![a-z-]+ly\\b)[a-z-]+){0,2})`, 'gi');
 const WAIT_RE = /\b(?:chill|marinat|soak|rest|refrigerat|fridge|freez|prove|proof|rise|infuse|steep|cool|stand)/i;
 const LONG_RE = /\bovernight\b|\b(?:the )?(?:day|night) before\b/i;
 const STORE_RE = /\b(?:store|storage|from frozen|leftovers|keeps?|reheat)\b/i;
@@ -153,13 +155,13 @@ let earlier = '';
 const waited = new Set();
 steps.forEach((s, si) => s.sentences.forEach(sentence => {
 for (const m of sentence.matchAll(USES_RE)) {
-const word = m[1].toLowerCase().replace(/(?:es|s)$/, '');
-if (!new RegExp('\\b' + word, 'i').test(earlier) && !readyIngs.some(i => new RegExp('\\b' + word, 'i').test(i))) {
+const words = m[1].toLowerCase().split(/\s+/).map(w => new RegExp('\\b' + w.replace(/(?:es|s)$/, ''), 'i'));
+if (!words.some(w => w.test(earlier) || readyIngs.some(i => w.test(i)))) {
 before.push({ tag: `Step ${si + 1} uses`, body: m[0].replace(/^(?:your|some)\s+/i, 'the ') });
 }
 }
 const long = !waited.has(si) && !STORE_RE.test(sentence) && (LONG_RE.test(sentence) ||
-(WAIT_RE.test(sentence) && [...sentence.matchAll(TIME_RE)].some(m => toSeconds(m) >= 3600)));
+(WAIT_RE.test(sentence.split(/\buntil\b/i)[0]) && [...sentence.matchAll(TIME_RE)].some(m => toSeconds(m) >= 3600)));
 if (long) { waited.add(si); before.push({ tag: `Long wait · step ${si + 1}`, body: sentence }); }
 earlier += ' ' + sentence;
 }));
