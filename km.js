@@ -1,6 +1,7 @@
 (() => {
 if (window.__kitchenMode) { window.__kitchenMode.close(); return; }
 const loader = !!document.currentScript?.src;
+const touch = matchMedia('(pointer: coarse)').matches;
 const h = (tag, props = {}, ...kids) => {
 const el = document.createElement(tag);
 for (const [k, v] of Object.entries(props)) {
@@ -104,7 +105,7 @@ method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerP
 body: JSON.stringify({
 api_key: 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
 properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-09-29', loader,
-$process_person_profile: false },
+touch, $process_person_profile: false },
 }),
 }).catch(() => {});
 } catch {}
@@ -386,7 +387,6 @@ const r = stage.getBoundingClientRect();
 (e.clientX - r.left < r.width * 0.3 ? back : next)();
 },
 });
-const touch = matchMedia('(pointer: coarse)').matches;
 const root = h('div', { class: 'km' },
 h('header', {},
 h('div', { class: 'title' }, '🍳 ', title),

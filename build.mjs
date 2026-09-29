@@ -1,5 +1,5 @@
 // Builds index.html: the Kitchen Mode landing page, with the button to drag onto the bookmarks bar,
-// and km.js: the same code as a file, for the short phone bookmark to load.
+// and km.js: the same code as a file, which the bookmark loads.
 import { readFileSync, writeFileSync } from 'node:fs';
 
 // Your X handle without the @. Leave empty to keep the credit off the page.
@@ -21,11 +21,9 @@ const source = readFileSync(new URL('./kitchen-mode.js', import.meta.url), 'utf8
   .filter(line => line && !line.startsWith('//'))
   .join('\n');
 
-const href = 'javascript:' + encodeURIComponent(source);
-
-// Phones get a short bookmark that loads km.js (the same code) from this site: pasting 34 KB of code into a
-// phone bookmark didn't survive, and a short one can be read back to check it. It also keeps phones up to date.
-// ES5 and no % or #, so it pastes and runs as written. If the site blocks the script, it says so.
+// The bookmark, on computers and phones alike, is a short loader for km.js (the same code) from this site, so
+// everyone runs the current build. Pasting 34 KB of code into a phone bookmark didn't survive, and a short one can be
+// read back to check it. ES5 and no % or #, so it pastes and runs as written. If the site blocks the script, it says so.
 const loader = `javascript:(function(){var s=document.createElement('script');s.src='${SITE_URL}/km.js';` +
   `s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()`;
 
@@ -612,7 +610,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
     <p class="lede for-mouse">One click on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
     <p class="lede for-touch">One tap on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
     <div class="actions">
-      <a class="bookmarklet for-mouse" href="${href}" data-tip="hint">Kitchen Mode</a>
+      <a class="bookmarklet for-mouse" href="${loader}" data-tip="hint">Kitchen Mode</a>
       <button class="button try" type="button" data-try>Try it on a sample recipe</button>
       <a class="button for-touch" href="#phone">Set it up on your phone</a>
     </div>
@@ -677,8 +675,8 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
       <p class="section-lede for-touch">Phones and tablets have no bookmarks bar to drag it to, so it goes in your bookmarks instead. It takes a couple of minutes, once.</p>
       <ol class="steps for-mouse">
         <li><div><strong>Show your bookmarks bar.</strong> Press <span class="combo"><kbd>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span> on a Mac, or <span class="combo"><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span> on Windows. Chrome, Edge, Brave, Safari and Firefox all have one.</div></li>
-        <li><div><strong>Drag this ticket up onto the bar.</strong><br><a class="bookmarklet compact" href="${href}" data-tip="tip">Kitchen Mode</a><p class="tip" id="tip" aria-live="polite"></p></div></li>
-        <li><div><strong>Open a recipe and click Kitchen Mode on the bar.</strong> Click it again, or press <kbd>Esc</kbd>, to close it. <a href="#test">Test it on the sample recipe</a>.</div></li>
+        <li><div><strong>Drag this ticket up onto the bar.</strong><br><a class="bookmarklet compact" href="${loader}" data-tip="tip">Kitchen Mode</a><p class="tip" id="tip" aria-live="polite"></p></div></li>
+        <li><div><strong>Test it.</strong> <a href="#test">Open the test recipe</a> and click Kitchen Mode on the bar. After that, use it the same way on any recipe. Click it again, or press <kbd>Esc</kbd>, to close it.</div></li>
       </ol>
       <details id="phone">
         <summary>Setting it up on a phone or tablet</summary>
@@ -712,7 +710,6 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
           <p>Once the test works, use it the same way on any recipe. This bookmark loads Kitchen Mode from this site each time, so it stays up to date.</p>
         </div>
       </details>
-      <p class="note for-mouse">Bookmarks on a computer don’t update themselves. To get a newer version, drag the ticket onto your bar again and delete the old one.</p>
     </div>
     <figure class="drawing for-mouse">
       <div class="frame">${drawing}</div>
@@ -853,7 +850,7 @@ function startTest() {
     if (!window.__kitchenMode) { trying = false; return; }
     if (trying) return;
     clearInterval(check);
-    count('test_passed', { loader: !!document.querySelector('script[src$="/km.js"]') });
+    count('test_passed', { loader: !!document.querySelector('script[src$="/km.js"]'), touch: matchMedia('(pointer: coarse)').matches });
     testCue.innerHTML = '<span class="done">It works.</span> Close it, then use it the same way on any recipe.';
   }, 400);
 }
@@ -875,9 +872,11 @@ document.querySelectorAll('.bookmarklet').forEach(function (a) {
     requestAnimationFrame(function () { dropCue.hidden = false; });
   });
   // dropEffect is "none" when the drag was cancelled; anything else means it landed, most likely on the bookmarks bar.
+  // The page can't tell whether it landed, so it always offers the test.
   a.addEventListener('dragend', function (e) {
     dropCue.hidden = true;
     count('drag_ended', { effect: e.dataTransfer.dropEffect });
+    document.getElementById(a.dataset.tip).innerHTML = 'On your bar now? <a href="#test">Test it on the sample recipe</a>.';
   });
 });
 
@@ -956,5 +955,5 @@ document.getElementById('copy').addEventListener('click', function () {
 
 writeFileSync(new URL('./index.html', import.meta.url), page);
 writeFileSync(new URL('./km.js', import.meta.url), source + '\n');
-console.log(`index.html written (bookmarklet ${(href.length / 1024).toFixed(1)} KB, page ${(page.length / 1024).toFixed(1)} KB)`);
-console.log(`km.js written (${(source.length / 1024).toFixed(1)} KB, loaded by the ${loader.length}-character phone bookmark)`);
+console.log(`index.html written (page ${(page.length / 1024).toFixed(1)} KB)`);
+console.log(`km.js written (${(source.length / 1024).toFixed(1)} KB, loaded by the ${loader.length}-character bookmark)`);
