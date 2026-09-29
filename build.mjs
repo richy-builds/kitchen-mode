@@ -168,13 +168,15 @@ const tested = [
 // Shown on the ticket; the rest sit behind "N more sites".
 const featured = new Set(['Allrecipes', 'BBC Good Food', 'BBC Food', 'Bon Appétit', 'Epicurious', 'Food Network',
   'Jamie Oliver', 'RecipeTin Eats', 'Sally’s Baking Addiction', 'Serious Eats', 'Simply Recipes', 'Tasty']);
+// Named in the hero, so people see sites they know before they scroll.
+const proof = ['BBC Good Food', 'Allrecipes', 'RecipeTin Eats', 'Serious Eats'];
 const menuItem = ([name, url]) =>
   `<li><a href="${url}" target="_blank" rel="noopener"><span>${name}</span><i></i>${icon(TICK, 18, 2.8)}</a></li>`;
 
 const favicon ='data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍳</text></svg>');
 const handleLink = HANDLE ? `<a href="https://x.com/${HANDLE}">@${HANDLE}</a>` : '';
-const description = 'A free browser button that turns a recipe page into big, step-by-step instructions you can read from across the kitchen, with timers you start with a tap.';
+const description = 'A free browser button for recipe pages. No clutter: each step a sentence at a time, big enough to read from across the kitchen, with timers you start with a tap.';
 
 // Line icons, drawn in currentColor.
 const icon = (paths, size, width = 2.4, extra = '') =>
@@ -324,9 +326,14 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   /* Hero: the copy on the left, the rail with tickets hanging from it on the right */
   .hero { display: grid; grid-template-columns: minmax(0, 1fr); }
   .hero-copy { container-type: inline-size; padding-top: 8px; }
-  h1 { margin: 22px 0 0; font-size: clamp(40px, 17.4cqi, 118px); line-height: .86; letter-spacing: -.01em; }
-  .lede { margin: 32px 0 0; max-width: 580px; font-size: clamp(18px, 1rem + .35vw, 21px); line-height: 1.5; text-wrap: pretty; }
-  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 36px; }
+  /* Sized to the column, and capped by the window's height so the button stays above the fold on a laptop */
+  h1 { margin: 22px 0 0; font-size: clamp(40px, min(17.4cqi, 14vh), 118px); line-height: .86; letter-spacing: -.01em; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .works { margin: 26px 0 0; max-width: 560px; font-size: 16px; line-height: 1.5; color: var(--muted); text-wrap: pretty; }
+  .works b { color: var(--ink); }
+  .works a { white-space: nowrap; }
+  .lede { margin: 26px 0 0; max-width: 580px; font-size: clamp(18px, 1rem + .35vw, 21px); line-height: 1.5; text-wrap: pretty; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 30px; }
   .button { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 66px; padding: 0 26px; border: 2px solid var(--ink); border-radius: 10px; background: transparent; color: var(--ink); font: 700 18px/1.2 var(--body); text-decoration: none; cursor: pointer; }
   .button:hover { background: color-mix(in srgb, var(--ink) 7%, transparent); }
   .button.small { min-height: 48px; padding: 0 18px; font-size: 16px; }
@@ -342,7 +349,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   .bookmarklet:active { cursor: grabbing; }
 
   /* Install hint: a tiny browser whose bookmarks bar the ticket lands in, so the drag reads at a glance */
-  .install { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px; margin-top: 30px; }
+  .install { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px; margin-top: 24px; }
   .install p { flex: 1 1 16em; max-width: 390px; margin: 0; font-size: 17px; line-height: 1.5; }
   .mini { flex: none; position: relative; width: 250px; border-radius: 12px; background: var(--ticket); border: 1px solid var(--rule-strong); box-shadow: 0 12px 24px -16px var(--shadow); overflow: hidden; font: 800 11px/1 var(--body); }
   .mini-top { display: flex; align-items: center; gap: 5px; padding: 9px 10px; }
@@ -536,7 +543,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 
   @media (min-width: 1200px) {
     .hero { grid-template-columns: minmax(0, 1fr) clamp(480px, 42vw, 604px); padding-bottom: 96px; }
-    .hero-copy { padding-top: 36px; }
+    .hero-copy { padding-top: 20px; }
     .pass { --rail-top: 56px; margin: 0 calc(-1 * min(46px, var(--gutter) - 10px)) 0 0; padding: calc(var(--rail-top) + 6px) 0 0; }
     .rail { height: 16px; border-radius: 8px; }
     .post { top: calc(var(--rail-top) - 12px); left: 10px; width: 12px; height: 40px; }
@@ -600,10 +607,10 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 <main>
 <div class="hero wrap">
   <div class="hero-copy">
-    <p class="kicker"><span class="tag">Order 001</span><span class="long">A free button for your browser</span><span class="short">Free</span></p>
-    <h1>Read the<br> recipe from<br> across the<br> kitchen.</h1>
-    <p class="lede for-mouse">Click Kitchen Mode on a recipe page and the steps come up one sentence at a time, big enough to read from the hob, with the ingredients each step needs and timers you start with a tap. Your screen stays on until you’re done.</p>
-    <p class="lede for-touch">Tap it on a recipe page for big steps, one sentence at a time, with the ingredients each step needs and timers you start with a tap.</p>
+    <p class="kicker"><span class="tag">Free</span><span class="long">A button for your browser · No app, no account</span><span class="short">No app, no account</span></p>
+    <h1>No clutter.<br> <em>Just the<br> next step.</em></h1>
+    <p class="lede for-mouse">One click on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
+    <p class="lede for-touch">One tap on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
     <div class="actions">
       <a class="bookmarklet for-mouse" href="${href}" data-tip="hint">Kitchen Mode</a>
       <button class="button try" type="button" data-try>Try it on a sample recipe</button>
@@ -618,7 +625,8 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
       <p><strong>Drag the Kitchen Mode ticket up onto your bookmarks bar.</strong> That’s the whole install. No bar? Press <span class="combo"><kbd data-mod>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span>.</p>
     </div>
     <p class="tip for-mouse" id="hint" aria-live="polite"></p>
-    <p class="phone-note for-touch">Phones and tablets have no bookmarks bar, so you paste a short code into a bookmark. It takes a couple of minutes.</p>
+    <p class="phone-note for-touch">Phones and tablets have no bookmarks bar, so you paste a short code into a bookmark. It takes a couple of minutes, once.</p>
+    <p class="works">Works on ${proof.map(name => `<b>${name}</b>`).join(', ')} <a href="#sites">and ${tested.length - proof.length} more sites</a></p>
   </div>
 
   <figure class="pass" role="img" aria-label="Kitchen Mode showing step 3 of a stew recipe on an order ticket clipped to a steel rail: one sentence in large type, the ingredients it needs, and a running timer.">
@@ -653,10 +661,10 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 <section class="features" aria-labelledby="features-title">
   <h2 class="vh" id="features-title">What it does</h2>
   <ol class="wrap">
-    <li><span class="num" aria-hidden="true">01</span><h3>One sentence at a time</h3><p>Each step is split into sentences and set big enough to read from the hob.</p></li>
-    <li><span class="num" aria-hidden="true">02</span><h3>Only what you need</h3><p>The ingredients the current sentence mentions, and nothing else.</p></li>
-    <li><span class="num" aria-hidden="true">03</span><h3>Timers on tap</h3><p>Any time in the text, like “cook for 8–10 mins”, starts a timer with one tap.</p></li>
-    <li><span class="num" aria-hidden="true">04</span><h3>Screen stays on</h3><p>No wiping flour off the trackpad to wake it up. Move on with a key, a tap, a swipe or a foot pedal.</p></li>
+    <li><span class="num" aria-hidden="true">01</span><h3>Just the recipe</h3><p>No ads, pop-ups or life story. It reads the recipe itself, not the page around it.</p></li>
+    <li><span class="num" aria-hidden="true">02</span><h3>One sentence at a time</h3><p>Set big enough to read from the hob, with the ingredients that sentence needs beside it.</p></li>
+    <li><span class="num" aria-hidden="true">03</span><h3>Timers on tap</h3><p>Tap “cook for 8–10 mins” and an 8-minute timer starts. It rings until you stop it, even if you close Kitchen Mode.</p></li>
+    <li><span class="num" aria-hidden="true">04</span><h3>Screen stays on</h3><p>No wiping flour off the screen to wake it up. Move on with a tap, a key, a swipe or a foot pedal.</p></li>
   </ol>
 </section>
 
@@ -760,6 +768,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
       <p class="kicker"><span class="tag">While you cook</span></p>
       <h2>Call the next step.</h2>
       <p>Your screen stays on while Kitchen Mode is open. A Bluetooth page-turner pedal or presentation clicker works as the next button too, so your hands never have to touch the screen.</p>
+      <p>Timers keep going if you close Kitchen Mode: they wait in the corner of the page and ring there. Tap one to get back to your step.</p>
     </div>
     <div class="ticket ticket-keys">
       <div class="t-body">
@@ -769,6 +778,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
           <dt>Next line</dt><dd><kbd>Space</kbd> or <kbd>→</kbd>, tap the right side, or swipe left</dd>
           <dt>Back</dt><dd><kbd>←</kbd>, tap the left side, or swipe right</dd>
           <dt>Start a timer</dt><dd>Tap a highlighted time like <span class="chip-sample">⏱︎ 5 mins</span>, or press <kbd>T</kbd></dd>
+          <dt>Stop a timer</dt><dd>Tap it when it rings, or press <kbd>Esc</kbd></dd>
           <dt>Tick off ingredients</dt><dd>Tap them on the first screen</dd>
           <dt>Close</dt><dd><kbd>Esc</kbd>, or click Kitchen Mode on the bar again</dd>
         </dl>

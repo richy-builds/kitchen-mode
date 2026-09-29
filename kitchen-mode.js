@@ -74,12 +74,24 @@
 
   const NUMBER_WORDS = {
     a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-    fifteen: 15, twenty: 20, thirty: 30, forty: 40, 'forty-five': 45,
+    fifteen: 15, twenty: 20, thirty: 30, forty: 40, 'forty-five': 45, 'half a': 0.5, 'half an': 0.5,
   };
-  const TIME_RE = /\b(\d+(?:\.\d+)?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|–|—|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b/gi;
+  const FRACTIONS = { '½': 0.5, '¼': 0.25, '¾': 0.75, '1/2': 0.5, '1/4': 0.25, '3/4': 0.75 };
+  const UNIT = { s: 1, m: 60, h: 3600 };
+  // "8–10 mins", "1 hr 30 mins", "1½ hours", "1 1/2 hours", "half an hour", "an hour and a half".
+  // Not preceded by a letter, digit or slash, so "1/2 hour" is never read as "2 hour".
+  const TIME_RE = /(?<![\w./])((?:\d+(?:\.\d+)?(?!\/))?\s*(?:[½¼¾]|[13]\/[24])|\d+(?:\.\d+)?|half an?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|–|—|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b(?:\s+(and a half)\b|\s+(?:and\s+)?(\d+)\s*(secs?|seconds|min(?:ute)?s?)\b)?/gi;
+  const amount = s => {
+    s = s.toLowerCase();
+    if (s in NUMBER_WORDS) return NUMBER_WORDS[s];
+    const [, whole = 0, frac] = /^(?:(\d+(?:\.\d+)?)(?!\/))?\s*(.*)$/.exec(s);
+    return +whole + (FRACTIONS[frac] || 0);
+  };
   // Ranges start the timer at the low end, so you check early rather than late.
-  const toSeconds = m => (NUMBER_WORDS[m[1].toLowerCase()] ?? parseFloat(m[1])) *
-    ({ s: 1, m: 60, h: 3600 })[m[2][0].toLowerCase()];
+  const toSeconds = m => {
+    const unit = UNIT[m[2][0].toLowerCase()], small = m[4] ? UNIT[m[5][0].toLowerCase()] : unit;
+    return amount(m[1]) * unit + (m[3] ? unit / 2 : 0) + (small < unit ? m[4] * small : 0);
+  };
 
   const STOP = new Set(`and or of the to for with into in on at from about plus extra few some small medium large big
     handful pinch dash splash good quality fresh freshly dried ground hot cold warm room temperature chopped finely
@@ -101,8 +113,9 @@
   const duration = iso => {
     const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?/.exec(iso || '');
     if (!m) return '';
-    const hrs = +(m[1] || 0) * 24 + +(m[2] || 0), mins = +(m[3] || 0);
-    return [hrs && `${hrs} hr`, mins && `${mins} min`].filter(Boolean).join(' ');
+    // "PT90M" reads as "1 hr 30 min".
+    const mins = (+(m[1] || 0) * 24 + +(m[2] || 0)) * 60 + +(m[3] || 0), hrs = Math.floor(mins / 60);
+    return [hrs && `${hrs} hr`, mins % 60 && `${mins % 60} min`].filter(Boolean).join(' ');
   };
 
   const recipe = findRecipe();
@@ -165,18 +178,20 @@
   const unlockAudio = () => {
     try { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch {}
   };
-  const beep = () => {
-    if (!audio) return;
-    const now = audio.currentTime;
-    [0, 0.25, 0.5].forEach(t => {
+  // Three short beeps at `at` on the audio clock, into the timer's own output so cancelling it silences them.
+  // A square wave near 1.8 kHz, like a kitchen timer's buzzer: phone speakers and ears both favour it over a low sine.
+  const beep = (out, at = audio?.currentTime) => {
+    if (!audio || !out) return;
+    [0, 0.25, 0.5].forEach(d => {
       const osc = audio.createOscillator(), gain = audio.createGain();
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, now + t);
-      gain.gain.exponentialRampToValueAtTime(0.5, now + t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.2);
-      osc.connect(gain).connect(audio.destination);
-      osc.start(now + t);
-      osc.stop(now + t + 0.22);
+      osc.type = 'square';
+      osc.frequency.value = 1760;
+      gain.gain.setValueAtTime(0.0001, at + d);
+      gain.gain.exponentialRampToValueAtTime(0.25, at + d + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + d + 0.2);
+      osc.connect(gain).connect(out);
+      osc.start(at + d);
+      osc.stop(at + d + 0.22);
     });
   };
   const clock = secs => {
@@ -191,7 +206,7 @@
       const left = (t.end - now) / 1000;
       if (left <= 0 && !t.ringing) { t.ringing = true; t.el.classList.add('ringing'); }
       t.time.textContent = t.ringing ? "Time's up!" : clock(left);
-      if (t.ringing && now - t.lastBeep > 2500) { t.lastBeep = now; beep(); }
+      if (t.ringing && now - t.lastBeep > 2500) { t.lastBeep = now; beep(t.out); }
     }
     const ringing = timers.some(t => t.ringing);
     if (ringing !== ringingTitle) {
@@ -199,30 +214,56 @@
       document.title = ringing ? `⏰ Time's up! ${origTitle}` : origTitle;
     }
   };
-  const removeTimer = t => { timers.splice(timers.indexOf(t), 1); t.el.remove(); tick(); };
-  const startTimer = (secs, label) => {
+  // A time in the text shows as started for as long as its timer runs, across screens.
+  const syncChips = () => stage.querySelectorAll('.chip').forEach(c =>
+    c.classList.toggle('started', timers.some(t => t.key === c.dataset.key)));
+  const removeTimer = t => {
+    const i = timers.indexOf(t);
+    if (i < 0) return;
+    timers.splice(i, 1);
+    t.out?.disconnect();
+    t.el.remove();
+    syncChips();
+    tick();
+    if (minimised && !timers.length) close();
+  };
+  const startTimer = (secs, label, key) => {
+    if (timers.some(t => t.key === key)) return;
     unlockAudio();
-    const t = { end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
+    const t = { key, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
+    if (audio) {
+      // Book the first rings on the audio clock as well: browsers slow down timers in background tabs, but not audio.
+      t.out = audio.createGain();
+      t.out.connect(audio.destination);
+      for (let i = 0; i < 4; i++) beep(t.out, audio.currentTime + secs + i * 2.5);
+      t.lastBeep = t.end + 7500;
+    }
     t.time = h('span', { class: 'time' }, clock(secs));
-    t.el = h('div', { class: 'timer', onclick: e => { e.stopPropagation(); if (t.ringing) removeTimer(t); } },
+    t.el = h('div', {
+      class: 'timer',
+      onclick: e => { e.stopPropagation(); if (t.ringing) removeTimer(t); else if (minimised) open(); },
+    },
       h('span', { class: 'label' }, label),
       t.time,
       h('button', { class: 'cancel', title: 'Cancel timer', onclick: e => { e.stopPropagation(); removeTimer(t); } }, '✕'));
     timers.push(t);
     tray.append(t.el);
+    syncChips();
     tick();
   };
   const tickId = setInterval(tick, 250);
 
-  const withTimers = (text, stepNo) => {
+  const withTimers = (text, si, bi) => {
     const out = [];
     let last = 0;
     for (const m of text.matchAll(TIME_RE)) {
       const secs = Math.round(toSeconds(m));
       if (!(secs > 0)) continue;
+      const key = `${si}.${bi}.${m.index}`;
       out.push(text.slice(last, m.index), h('button', {
-        class: 'chip',
-        onclick: e => { e.stopPropagation(); e.currentTarget.classList.add('started'); startTimer(secs, `Step ${stepNo}`); },
+        class: timers.some(t => t.key === key) ? 'chip started' : 'chip',
+        'data-key': key,
+        onclick: e => { e.stopPropagation(); startTimer(secs, `Step ${si + 1}`, key); },
       }, '⏱︎ ', m[0]));
       last = m.index + m[0].length;
     }
@@ -265,7 +306,7 @@
         h('div', { class: 'eyebrow' }, `Step ${si + 1} of ${steps.length}`, step.section && ` · ${step.section}`),
         h('p', { class: 'step', style: `font-size:${fontSize(step.text.length)}` },
           step.sentences.map((s, i) => [
-            h('span', { class: i === bi ? 's on' : i < bi ? 's past' : 's' }, withTimers(s, si + 1)), ' ',
+            h('span', { class: i === bi ? 's on' : i < bi ? 's past' : 's' }, withTimers(s, si, i)), ' ',
           ]))),
       h('aside', { class: 'need' }, h('div', { class: 'stub' },
         h('div', { class: 'eyebrow' }, "You'll need"),
@@ -304,6 +345,7 @@
     h('div', { class: 'progress' }, bars),
     stage,
     h('footer', {},
+      h('button', { class: 'reopen', onclick: e => { e.stopPropagation(); open(); } }, 'Back to Kitchen Mode'),
       tray,
       h('div', { class: 'hint' }, touch
         ? 'Tap right → next · tap left ← back'
@@ -331,12 +373,19 @@
   const getLock = async () => {
     if (!('wakeLock' in navigator)) { setAwake(false); return; }
     try {
-      lock = await navigator.wakeLock.request('screen');
+      const l = await navigator.wakeLock.request('screen');
+      // Closed while the request was pending, or a second request won the race.
+      if (!wantLock || lock) { l.release().catch(() => {}); return; }
+      lock = l;
       setAwake(true);
-      lock.addEventListener('release', () => { lock = null; setAwake(false); });
+      l.addEventListener('release', () => { lock = null; setAwake(false); });
     } catch { setAwake(false); }
   };
-  const onVisible = () => { if (wantLock && !lock && document.visibilityState === 'visible') getLock(); };
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible') return;
+    if (wantLock && !lock) getLock();
+    audio?.resume().catch(() => {});
+  };
 
   /* ---------- input ---------- */
   const NEXT_KEYS = [' ', 'ArrowRight', 'ArrowDown', 'PageDown', 'Enter'];
@@ -344,10 +393,14 @@
   const onKey = e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key;
+    // Enter and Space press a button that has keyboard focus, rather than moving on.
+    if ((k === 'Enter' || k === ' ') && e.composedPath()[0]?.tagName === 'BUTTON') return;
+    const ringing = timers.filter(t => t.ringing);
     if (NEXT_KEYS.includes(k)) { if (!e.repeat) next(); }
     else if (BACK_KEYS.includes(k)) { if (!e.repeat) back(); }
-    else if (k === 'Escape') close();
-    else if (k === 't' || k === 'T') stage.querySelector('.s.on .chip')?.click();
+    // Esc stops a ringing timer first, the way you'd reach for it, and only then closes.
+    else if (k === 'Escape') { if (ringing.length) ringing.forEach(removeTimer); else close(); }
+    else if (k === 't' || k === 'T') { if (!e.repeat) stage.querySelector('.s.on .chip:not(.started)')?.click(); }
     else return;
     e.preventDefault();
     e.stopImmediatePropagation();
@@ -365,7 +418,8 @@
 
   /* ---------- mount ---------- */
   const host = document.createElement('kitchen-mode');
-  host.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;display:block;';
+  const place = where => { host.style.cssText = `all:initial;position:fixed;${where};z-index:2147483647;display:block;`; };
+  place('inset:0');
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.append(h('style', {}, `
 :host { --bg:#fbf7f0; --panel:#f3ecdf; --ink:#1f1a14; --soft:#6b5f52; --line:#e6dccb; --dash:#d6c8b2; --accent:#d92d20; --on-accent:#fff; --accent-deep:#821b13; --chip:#ffe9b8; --amber:#ffb020; --on-amber:#1f1a14; --ring:#d92d20; --on-ring:#fff; --stub:#fff; --clip:linear-gradient(#63686e,#2b2e32); --shadow:rgb(52 36 20 / .2); --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace; }
@@ -431,6 +485,13 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 .timer.ringing::after { content:"tap to stop"; font-size:12px; }
 @keyframes pulse { 50% { transform:scale(1.05); } }
 .hint { color:var(--soft); font:400 12px/1.3 var(--mono); white-space:nowrap; }
+.reopen { display:none; }
+.km.mini { position:static; display:block; background:none; }
+.mini header, .mini .progress, .mini .stage, .mini .hint { display:none; }
+.mini footer { flex-direction:column; align-items:flex-end; gap:8px; min-height:0; padding:0; }
+.mini .timers { flex-direction:column; align-items:flex-end; }
+.mini .timer, .mini .reopen { box-shadow:0 8px 24px rgb(0 0 0 / .3); cursor:pointer; }
+.mini .reopen { display:block; padding:10px 14px; border-radius:999px; background:var(--ink); color:var(--bg); font:600 12px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; }
 @media (max-width: 820px) {
   .overview, .cook { grid-template-columns:1fr; align-items:start; }
   .cook > div { padding:0 0 24px; border-right:0; border-bottom:2px dashed var(--dash); }
@@ -442,29 +503,45 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
   document.documentElement.append(host);
 
   const prevOverflow = document.documentElement.style.overflow;
-  document.documentElement.style.overflow = 'hidden';
-  document.activeElement?.blur?.();
-  window.addEventListener('keydown', onKey, true);
-  document.addEventListener('visibilitychange', onVisible);
-  // Android's back gesture closes Kitchen Mode instead of leaving the recipe page.
-  // CloseWatcher is Chrome 120+ only; unlike pushState it leaves the site's own history alone.
-  const watcher = window.CloseWatcher ? new CloseWatcher() : null;
-  if (watcher) watcher.onclose = () => close();
-  getLock();
-  render();
-
+  let watcher = null, minimised = false;
+  const open = () => {
+    minimised = false;
+    root.classList.remove('mini');
+    place('inset:0');
+    document.documentElement.style.overflow = 'hidden';
+    document.activeElement?.blur?.();
+    window.addEventListener('keydown', onKey, true);
+    // Android's back gesture closes Kitchen Mode instead of leaving the recipe page.
+    // CloseWatcher is Chrome 120+ only; unlike pushState it leaves the site's own history alone.
+    watcher = window.CloseWatcher ? new CloseWatcher() : null;
+    if (watcher) watcher.onclose = () => close();
+    render();
+  };
+  // Closing never loses a running timer: the timers move to a corner of the page and ring there as usual.
+  // Tapping one brings Kitchen Mode back where you left it, and stopping the last one closes it for good.
   const close = () => {
+    window.removeEventListener('keydown', onKey, true);
+    watcher?.destroy();
+    watcher = null;
+    document.documentElement.style.overflow = prevOverflow;
+    if (timers.length) {
+      minimised = true;
+      root.classList.add('mini');
+      place('right:12px;bottom:12px');
+      return;
+    }
     wantLock = false;
     lock?.release().catch(() => {});
     clearInterval(tickId);
-    window.removeEventListener('keydown', onKey, true);
     document.removeEventListener('visibilitychange', onVisible);
-    watcher?.destroy();
     host.remove();
-    document.documentElement.style.overflow = prevOverflow;
     document.title = origTitle;
     audio?.close?.();
     delete window.__kitchenMode;
   };
-  window.__kitchenMode = { close };
+  document.addEventListener('visibilitychange', onVisible);
+  getLock();
+  open();
+  // Running the bookmark again closes Kitchen Mode, or brings it back if only its timers are showing.
+  window.__kitchenMode = { close: () => (minimised ? open() : close()) };
 })();
