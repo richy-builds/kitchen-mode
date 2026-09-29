@@ -66,10 +66,12 @@ adb reverse tcp:8765 tcp:8765 && python3 -m http.server 8765  # its Chrome can t
 
 `chrome://inspect` in Chrome on the Mac attaches DevTools to the emulator's tabs. `adb` is in `~/Library/Android/sdk/platform-tools`. It was installed with Homebrew (`openjdk@21`, `android-commandlinetools`), then `sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"` and `avdmanager create avd -n kitchen_pixel -d pixel_8`. It isn't signed in to Google, so Chrome doesn't update and the Play Store can't install other browsers.
 
-Deploy (static files, no build step on Vercel):
+Deploy by pushing `main`: Vercel's Git integration publishes it to production in about 30 seconds (static files, no build step on Vercel). Run `node build.mjs` and commit `index.html` and `km.js` first, since Vercel serves them as committed. Every phone bookmark loads `km.js` from the live site on each open, so a push reaches all phone users at once. Check it landed:
 
 ```sh
-vercel deploy --prod
+git push origin main
+vercel ls                                                     # newest row: Production, Ready
+diff <(curl -s "https://kitchen-mode.vercel.app/km.js?v=$(date +%s)") km.js && echo live
 ```
 
 ## Usage counts
