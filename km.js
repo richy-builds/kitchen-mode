@@ -136,6 +136,41 @@ const neededFor = sentence => {
 const t = sentence.toLowerCase();
 return ingredients.filter((_, i) => matchKeys[i].some(k => new RegExp('\\b' + k).test(t)));
 };
+const READY = 'cooked|cooled|chilled|softened|melted|toasted|soaked|marinated|boiled|leftover|defrosted|thawed|room temperature';
+const READY_RE = new RegExp(`\\b(?:${READY})\\b(?! sesame oil)`, 'i');
+const USES_RE = new RegExp(`\\b(?:the|your|some|leftover)\\s+(?:[a-z-]+\\s+)?(?:${READY})\\s+([a-z-]+)`, 'gi');
+const WAIT_RE = /\b(?:chill|marinat|soak|rest|refrigerat|fridge|freez|prove|proof|rise|infuse|steep|cool|stand)/i;
+const LONG_RE = /\bovernight\b|\b(?:the )?(?:day|night) before\b/i;
+const STORE_RE = /\b(?:store|storage|from frozen|leftovers|keeps?|reheat)\b/i;
+const WANTS_HOT = /\bpre-?heated\s+(oven|grill|broiler)\b|\b(oven|grill|broiler)\b[^.]{0,30}\bpre-?heated\b/i;
+const TURNS_ON = /\bpre-?heat(?!ed)|\bheat (?:the |your |an? )?(?:oven|grill|broiler)|\b(?:oven|grill|broiler)\s+(?:on\b|to\s+\d)|\bturn on (?:the )?(?:oven|grill)/i;
+const TEMP_RE = /\b\d{2,3}\s?°?\s?[CF]\b(?:\s?fan)?|\bgas(?: mark)? \d\b/i;
+const before = [];
+const readyIngs = ingredients.filter(i => READY_RE.test(i));
+readyIngs.forEach(i => before.push({ tag: 'Have ready', body: formatIngredient(i) }));
+let earlier = '';
+const waited = new Set();
+steps.forEach((s, si) => s.sentences.forEach(sentence => {
+for (const m of sentence.matchAll(USES_RE)) {
+const word = m[1].toLowerCase().replace(/(?:es|s)$/, '');
+if (!new RegExp('\\b' + word, 'i').test(earlier) && !readyIngs.some(i => new RegExp('\\b' + word, 'i').test(i))) {
+before.push({ tag: `Step ${si + 1} uses`, body: m[0].replace(/^(?:your|some)\s+/i, 'the ') });
+}
+}
+const long = !waited.has(si) && !STORE_RE.test(sentence) && (LONG_RE.test(sentence) ||
+(WAIT_RE.test(sentence) && [...sentence.matchAll(TIME_RE)].some(m => toSeconds(m) >= 3600)));
+if (long) { waited.add(si); before.push({ tag: `Long wait · step ${si + 1}`, body: sentence }); }
+earlier += ' ' + sentence;
+}));
+const hotStep = steps.findIndex(s => WANTS_HOT.test(s.text));
+if (hotStep >= 0 && !steps.some(s => TURNS_ON.test(s.text))) {
+const [, a, b] = WANTS_HOT.exec(steps[hotStep].text);
+const temp = steps.map(s => s.text.match(TEMP_RE)?.[0]).find(Boolean);
+before.push({
+tag: (a || b)[0].toUpperCase() + (a || b).slice(1).toLowerCase(),
+body: `Heat it${temp ? ` to ${temp}` : ''} now. Step ${hotStep + 1} wants it hot, and no step says to turn it on.`,
+});
+}
 const beats = [];
 steps.forEach((s, si) => s.sentences.forEach((_, bi) => beats.push({ si, bi })));
 let pos = -1; // -1 = ingredients overview, beats.length = finished
@@ -160,6 +195,25 @@ osc.start(at + d);
 osc.stop(at + d + 0.22);
 });
 };
+const say = text => {
+try {
+const u = new SpeechSynthesisUtterance(text);
+const lang = document.documentElement.lang;
+u.lang = /^en\b/i.test(lang) ? lang : 'en';
+speechSynthesis.speak(u);
+} catch {}
+};
+let voiceReady = false;
+const unlockVoice = () => {
+if (voiceReady) return;
+voiceReady = true;
+try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {}
+};
+const VERB_RE = /\b(bake|roast|boil|simmer|cook|fry|grill|griddle|broil|rest|chill|marinate|soak|steam|poach|blanch|toast|brown|sear|braise|reduce|stir|whisk|knead|prove|proof|rise|cool|stand|microwave|saut[eé]|caramelise|caramelize|soften|melt|bubble|char|freeze|steep|infuse|blitz|blend|mix|beat)(?:s|ing)?\b/gi;
+const verbBefore = text => {
+const m = [...text.matchAll(VERB_RE)].pop();
+return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : '';
+};
 const clock = secs => {
 const s = Math.max(0, Math.ceil(secs));
 const hrs = Math.floor(s / 3600), mins = Math.floor((s % 3600) / 60), rest = String(s % 60).padStart(2, '0');
@@ -170,7 +224,11 @@ const tick = () => {
 const now = Date.now();
 for (const t of timers) {
 const left = (t.end - now) / 1000;
-if (left <= 0 && !t.ringing) { t.ringing = true; t.el.classList.add('ringing'); }
+if (left <= 0 && !t.ringing) {
+t.ringing = true;
+t.el.classList.add('ringing');
+setTimeout(() => { if (timers.includes(t)) say(t.speech); }, 900);
+}
 t.time.textContent = t.ringing ? "Time's up!" : clock(left);
 if (t.ringing && now - t.lastBeep > 2500) { t.lastBeep = now; beep(t.out); }
 }
@@ -179,6 +237,34 @@ if (ringing !== ringingTitle) {
 ringingTitle = ringing;
 document.title = ringing ? `⏰ Time's up! ${origTitle}` : origTitle;
 }
+glanceTick(now, ringing);
+};
+const IDLE_MS = 10000;
+let lastTouch = Date.now(), glancing = false;
+const glanceName = h('div', { class: 'g-name' });
+const glanceTime = h('div', { class: 'g-time' });
+const glanceMore = h('div', { class: 'g-more' });
+const glanceNow = h('p', { class: 'g-now' });
+const glance = h('div', { class: 'glance', onclick: e => { e.stopPropagation(); wake(); } },
+glanceName, glanceTime, glanceMore, glanceNow);
+const wake = () => {
+lastTouch = Date.now();
+if (glancing) { glancing = false; glance.classList.remove('on'); }
+};
+const glanceTick = (now, ringing) => {
+const running = timers.filter(t => !t.ringing).sort((a, b) => a.end - b.end);
+const on = !minimised && !ringing && running.length > 0 && now - lastTouch > IDLE_MS;
+if (on !== glancing) {
+glancing = on;
+glance.classList.toggle('on', on);
+const beat = beats[pos];
+glanceNow.textContent = beat ? steps[beat.si].sentences[beat.bi].replace(/(\d)\s*([–-])\s*(\d)/g, '$1\u2060$2\u2060$3') : '';
+}
+if (!on) return;
+const [first, ...rest] = running;
+glanceName.textContent = first.label;
+glanceTime.textContent = clock((first.end - now) / 1000);
+glanceMore.textContent = rest.map(t => `${t.label} ${clock((t.end - now) / 1000)}`).join('  ·  ');
 };
 const syncChips = () => stage.querySelectorAll('.chip').forEach(c =>
 c.classList.toggle('started', timers.some(t => t.key === c.dataset.key)));
@@ -187,15 +273,17 @@ const i = timers.indexOf(t);
 if (i < 0) return;
 timers.splice(i, 1);
 t.out?.disconnect();
+if (t.ringing) try { speechSynthesis.cancel(); } catch {}
 t.el.remove();
 syncChips();
 tick();
 if (minimised && !timers.length) close();
 };
-const startTimer = (secs, label, key) => {
+const startTimer = (secs, label, key, speech) => {
 if (timers.some(t => t.key === key)) return;
 unlockAudio();
-const t = { key, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
+unlockVoice();
+const t = { key, label, speech, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
 if (audio) {
 t.out = audio.createGain();
 t.out.connect(audio.destination);
@@ -223,10 +311,13 @@ for (const m of text.matchAll(TIME_RE)) {
 const secs = Math.round(toSeconds(m));
 if (!(secs > 0)) continue;
 const key = `${si}.${bi}.${m.index}`;
+const verb = verbBefore(text.slice(0, m.index));
+const label = verb ? `Step ${si + 1} · ${verb}` : `Step ${si + 1}`;
+const speech = `${verb ? `${verb}, step` : 'Step'} ${si + 1}. Time's up.`;
 out.push(text.slice(last, m.index), h('button', {
 class: timers.some(t => t.key === key) ? 'chip started' : 'chip',
 'data-key': key,
-onclick: e => { e.stopPropagation(); startTimer(secs, `Step ${si + 1}`, key); },
+onclick: e => { e.stopPropagation(); startTimer(secs, label, key, speech); },
 }, '⏱︎ ', m[0]));
 last = m.index + m[0].length;
 }
@@ -243,6 +334,9 @@ h('div', {},
 h('div', { class: 'eyebrow' }, 'Kitchen Mode'),
 h('h1', {}, title),
 meta && h('div', { class: 'meta' }, meta),
+before.length > 0 && h('div', { class: 'before' }, h('div', { class: 'stub' },
+h('div', { class: 'eyebrow' }, 'Before you start'),
+h('ul', {}, before.map(b => h('li', {}, h('span', { class: 'tag' }, b.tag), h('span', {}, b.body)))))),
 ingredients.length && [
 h('div', { class: 'eyebrow' }, 'Ingredients', h('span', { class: 'soft' }, ' · tap to tick off')),
 h('ul', { class: 'ings' }, ingredients.map((ing, i) => h('li', {
@@ -305,7 +399,8 @@ h('button', { class: 'reopen', onclick: e => { e.stopPropagation(); open(); } },
 tray,
 h('div', { class: 'hint' }, touch
 ? 'Tap right → next · tap left ← back'
-: 'Space or tap → next · ← back · T timer · Esc close')));
+: 'Space or tap → next · ← back · T timer · Esc close')),
+glance);
 const render = () => {
 stage.replaceChildren(pos < 0 ? overview() : pos >= beats.length ? finished() : cooking());
 bars.forEach((bar, si) => {
@@ -342,6 +437,7 @@ const NEXT_KEYS = [' ', 'ArrowRight', 'ArrowDown', 'PageDown', 'Enter'];
 const BACK_KEYS = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
 const onKey = e => {
 if (e.metaKey || e.ctrlKey || e.altKey) return;
+wake();
 const k = e.key;
 if ((k === 'Enter' || k === ' ') && e.composedPath()[0]?.tagName === 'BUTTON') return;
 const ringing = timers.filter(t => t.ringing);
@@ -361,6 +457,8 @@ const dx = e.changedTouches[0].clientX - touchX;
 touchX = null;
 if (Math.abs(dx) > 60) (dx < 0 ? next : back)();
 });
+root.addEventListener('pointerdown', wake, true);
+root.addEventListener('wheel', wake, { capture: true, passive: true });
 root.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
 const host = document.createElement('kitchen-mode');
 const place = where => { host.style.cssText = `all:initial;position:fixed;${where};z-index:2147483647;display:block;`; };
@@ -403,11 +501,15 @@ header { display:flex; align-items:center; gap:14px; padding:14px clamp(16px,3vw
 .s.on { opacity:1; }
 .chip { display:inline; background:var(--chip); color:var(--ink); font-weight:650; padding:0 .28em; border-radius:.3em; white-space:nowrap; }
 .chip.started { background:var(--amber); color:var(--on-amber); }
-.need, .receipt { position:relative; padding-top:12px; filter:drop-shadow(0 14px 18px var(--shadow)); }
-.need::before, .receipt::before { content:""; position:absolute; top:0; left:50%; z-index:1; width:56px; height:22px; margin-left:-28px; border-radius:4px; background:var(--clip); }
+.need, .receipt, .before { position:relative; padding-top:12px; filter:drop-shadow(0 14px 18px var(--shadow)); }
+.need::before, .receipt::before, .before::before { content:""; position:absolute; top:0; left:50%; z-index:1; width:56px; height:22px; margin-left:-28px; border-radius:4px; background:var(--clip); }
 .stub { background:var(--stub); padding:24px 26px 38px; -webkit-mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/18px 100%; mask:conic-gradient(from -45deg at bottom,#0000,#000 1deg 89deg,#0000 90deg) 50%/18px 100%; }
-.need .eyebrow { color:var(--soft); padding-bottom:12px; border-bottom:2px dashed var(--dash); }
-.need ul { list-style:none; margin:0; padding:0; }
+.need .eyebrow, .before .eyebrow { color:var(--soft); padding-bottom:12px; border-bottom:2px dashed var(--dash); }
+.need ul, .before ul { list-style:none; margin:0; padding:0; }
+.before { max-width:640px; margin-bottom:36px; }
+.before li { display:grid; grid-template-columns:150px minmax(0,1fr); gap:3px 14px; align-items:baseline; padding:9px 0; font-size:clamp(17px,1.6vw,21px); line-height:1.3; }
+.before li + li { border-top:1px dashed var(--dash); }
+.before .tag { font:700 12px/1.3 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
 .need li { font-size:clamp(19px,1.9vw,26px); line-height:1.25; padding:9px 0; }
 .need li + li { border-top:1px dashed var(--dash); }
 .none { color:var(--soft); margin:0; font-size:18px; }
@@ -430,9 +532,19 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 .timer.ringing::after { content:"tap to stop"; font-size:12px; }
 @keyframes pulse { 50% { transform:scale(1.05); } }
 .hint { color:var(--soft); font:400 12px/1.3 var(--mono); white-space:nowrap; }
+.glance { display:none; position:absolute; inset:0; z-index:2; background:var(--bg); padding:24px clamp(16px,4vw,64px); place-content:center; justify-items:center; gap:clamp(14px,3vh,28px); text-align:center; cursor:pointer; animation:fade .5s ease-out; }
+.glance.on { display:grid; }
+.g-name { font:700 clamp(18px,2.6vw,30px)/1.2 var(--mono); letter-spacing:.1em; text-transform:uppercase; color:var(--accent); }
+.g-time { font:700 clamp(88px,min(22vw,38vh),300px)/1 var(--mono); font-variant-numeric:tabular-nums; letter-spacing:-.03em; background:var(--amber); color:var(--on-amber); border-radius:.1em; padding:.06em .22em; }
+.g-more { font:600 clamp(15px,1.8vw,22px)/1.3 var(--mono); color:var(--soft); font-variant-numeric:tabular-nums; }
+.g-more:empty { display:none; }
+.g-now { margin:0; max-width:34ch; font-size:clamp(19px,2.2vw,30px); line-height:1.3; font-weight:520; text-wrap:pretty; }
+.g-now:empty { display:none; }
+@keyframes fade { from { opacity:0; } }
+@media (prefers-reduced-motion: reduce) { .glance { animation:none; } }
 .reopen { display:none; }
 .km.mini { position:static; display:block; background:none; }
-.mini header, .mini .progress, .mini .stage, .mini .hint { display:none; }
+.mini header, .mini .progress, .mini .stage, .mini .hint, .mini .glance { display:none; }
 .mini footer { flex-direction:column; align-items:flex-end; gap:8px; min-height:0; padding:0; }
 .mini .timers { flex-direction:column; align-items:flex-end; }
 .mini .timer, .mini .reopen { box-shadow:0 8px 24px rgb(0 0 0 / .3); cursor:pointer; }
@@ -443,6 +555,7 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 .title { font-size:12px; letter-spacing:.04em; }
 .pill { font-size:11px; padding:7px 10px; }
 .hero, .hint { display:none; }
+.before li { grid-template-columns:1fr; }
 }
 `), root);
 document.documentElement.append(host);
@@ -477,6 +590,7 @@ document.removeEventListener('visibilitychange', onVisible);
 host.remove();
 document.title = origTitle;
 audio?.close?.();
+try { speechSynthesis.cancel(); } catch {}
 delete window.__kitchenMode;
 };
 document.addEventListener('visibilitychange', onVisible);
