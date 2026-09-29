@@ -291,39 +291,62 @@
       ringingTitle = ringing;
       document.title = ringing ? `⏰ Time's up! ${origTitle}` : origTitle;
     }
-    glanceTick(now, ringing);
+    glanceTick(now);
   };
 
   /* ---------- glance mode ---------- */
   // With a timer running and the screen left alone for a while, the countdown grows to be read from across
-  // the room, with the current sentence still underneath. A tap or any key brings the full view back.
+  // the room, with the current sentence and the next one underneath. A tap or any key brings the full view back.
+  // A ringing timer takes the screen over at once, in red, whatever you're doing, and a tap stops it.
   const IDLE_MS = 10000;
-  let lastTouch = Date.now(), glancing = false;
+  let lastTouch = Date.now(), glancing = '', shown = null, glanceOff = false;
   const glanceName = h('div', { class: 'g-name' });
   const glanceTime = h('div', { class: 'g-time' });
   const glanceMore = h('div', { class: 'g-more' });
   const glanceNow = h('p', { class: 'g-now' });
-  const glance = h('div', { class: 'glance', onclick: e => { e.stopPropagation(); wake(); } },
-    glanceName, glanceTime, glanceMore, glanceNow);
-  const wake = () => {
+  const glanceNext = h('p', { class: 'g-next' });
+  // Keeping the timer small lasts until Kitchen Mode closes. The footer offers the big one back meanwhile.
+  const keepSmall = h('button', { class: 'g-small', onclick: e => { e.stopPropagation(); glanceOff = true; wake(); } },
+    'Keep timer small');
+  const bigAgain = h('button', { class: 'pill big-again', hidden: '', onclick: e => { e.stopPropagation(); glanceOff = false; tick(); } },
+    'Big timer: off');
+  const glance = h('div', {
+    class: 'glance',
+    onclick: e => { e.stopPropagation(); if (glancing === 'ring') removeTimer(shown); else wake(); },
+  }, glanceName, glanceTime, glanceMore, glanceNow, glanceNext, keepSmall);
+  const hideGlance = () => { glancing = ''; shown = null; glance.className = 'glance'; };
+  const wake = e => {
+    // A press on the big timer is left to its own click. Waking here would hide it before the click arrives, and on
+    // a touch screen the click would then land on the step underneath and move on.
+    if (e?.type === 'pointerdown' && glance.contains(e.target)) return;
     lastTouch = Date.now();
-    if (glancing) { glancing = false; glance.classList.remove('on'); }
+    if (glancing === 'wait') hideGlance();
   };
-  const glanceTick = (now, ringing) => {
+  // Word joiners keep a range like "8–10" on one line.
+  const sentenceAt = i => beats[i] ? steps[beats[i].si].sentences[beats[i].bi].replace(/(\d)\s*([–-])\s*(\d)/g, '$1⁠$2⁠$3') : '';
+  const showNext = i => glanceNext.replaceChildren(...(beats[i] && i > 0 ? [
+    h('span', { class: 'g-label' }, beats[i].si === beats[i - 1].si ? 'Next' : `Next · Step ${beats[i].si + 1}`), sentenceAt(i),
+  ] : []));
+  const glanceTick = now => {
+    const ring = minimised ? null : timers.filter(t => t.ringing).sort((a, b) => a.end - b.end)[0];
     const running = timers.filter(t => !t.ringing).sort((a, b) => a.end - b.end);
-    const on = !minimised && !ringing && running.length > 0 && now - lastTouch > IDLE_MS;
-    if (on !== glancing) {
-      glancing = on;
-      glance.classList.toggle('on', on);
-      const beat = beats[pos];
-      // Word joiners keep a range like "8–10" on one line.
-      glanceNow.textContent = beat ? steps[beat.si].sentences[beat.bi].replace(/(\d)\s*([–-])\s*(\d)/g, '$1\u2060$2\u2060$3') : '';
+    const mode = ring ? 'ring' : !minimised && !glanceOff && running.length && now - lastTouch > IDLE_MS ? 'wait' : '';
+    bigAgain.hidden = !(glanceOff && timers.length);
+    if (!mode) { if (glancing) hideGlance(); return; }
+    const [first, ...rest] = ring ? [ring] : running;
+    if (mode !== glancing || first !== shown) {
+      glancing = mode;
+      shown = first;
+      glance.className = `glance on ${mode}`;
+      glanceName.textContent = first.label;
+      // Ringing, "next" is what follows the sentence the timer came from, which may not be the one on screen.
+      const [si, bi] = first.key.split('.').map(Number);
+      const from = ring ? beats.findIndex(b => b.si === si && b.bi === bi) : pos;
+      glanceNow.textContent = ring ? '' : sentenceAt(pos);
+      showNext(from + 1);
     }
-    if (!on) return;
-    const [first, ...rest] = running;
-    glanceName.textContent = first.label;
-    glanceTime.textContent = clock((first.end - now) / 1000);
-    glanceMore.textContent = rest.map(t => `${t.label} ${clock((t.end - now) / 1000)}`).join('  ·  ');
+    glanceTime.textContent = ring ? "Time's up" : clock((first.end - now) / 1000);
+    glanceMore.textContent = ring ? 'Tap to stop' : rest.map(t => `${t.label} ${clock((t.end - now) / 1000)}`).join('  ·  ');
   };
   // A time in the text shows as started for as long as its timer runs, across screens.
   const syncChips = () => stage.querySelectorAll('.chip').forEach(c =>
@@ -339,17 +362,19 @@
     tick();
     if (minimised && !timers.length) close();
   };
+  const RINGS_BOOKED = 36;
   const startTimer = (secs, label, key, speech) => {
     if (timers.some(t => t.key === key)) return;
     unlockAudio();
     unlockVoice();
     const t = { key, label, speech, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
     if (audio) {
-      // Book the first rings on the audio clock as well: browsers slow down timers in background tabs, but not audio.
+      // Book the first 90 seconds of rings on the audio clock as well: browsers slow down timers in background tabs,
+      // Chrome to once a minute, but not audio. Once the page is making sound its timers speed up again and take over.
       t.out = audio.createGain();
       t.out.connect(audio.destination);
-      for (let i = 0; i < 4; i++) beep(t.out, audio.currentTime + secs + i * 2.5);
-      t.lastBeep = t.end + 7500;
+      for (let i = 0; i < RINGS_BOOKED; i++) beep(t.out, audio.currentTime + secs + i * 2.5);
+      t.lastBeep = t.end + (RINGS_BOOKED - 1) * 2500;
     }
     t.time = h('span', { class: 'time' }, clock(secs));
     t.el = h('div', {
@@ -465,6 +490,7 @@
     h('footer', {},
       h('button', { class: 'reopen', onclick: e => { e.stopPropagation(); open(); } }, 'Back to Kitchen Mode'),
       tray,
+      bigAgain,
       h('div', { class: 'hint' }, touch
         ? 'Tap right → next · tap left ← back'
         : 'Space or tap → next · ← back · T timer · Esc close')),
@@ -619,6 +645,15 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 .g-more:empty { display:none; }
 .g-now { margin:0; max-width:34ch; font-size:clamp(19px,2.2vw,30px); line-height:1.3; font-weight:520; text-wrap:pretty; }
 .g-now:empty { display:none; }
+.g-next { margin:0; max-width:34ch; font-size:clamp(17px,1.9vw,26px); line-height:1.3; color:var(--soft); text-wrap:pretty; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; }
+.g-next:empty { display:none; }
+.g-label { font:700 .72em/1 var(--mono); letter-spacing:.1em; text-transform:uppercase; margin-right:.6em; }
+.g-small { position:absolute; right:16px; bottom:16px; font:600 12px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; padding:12px 16px; border-radius:999px; background:var(--panel); color:var(--soft); }
+.glance.ring { background:var(--ring); color:var(--on-ring); }
+.ring .g-name, .ring .g-more, .ring .g-next { color:inherit; }
+.ring .g-time { background:none; color:inherit; font-size:clamp(52px,min(13vw,24vh),180px); letter-spacing:0; }
+.ring .g-small, .mini .big-again { display:none; }
+@media (max-height: 520px) { .wait .g-next { display:none; } }
 @keyframes fade { from { opacity:0; } }
 @media (prefers-reduced-motion: reduce) { .glance { animation:none; } }
 .reopen { display:none; }
