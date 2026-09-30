@@ -53,7 +53,7 @@ test.describe('on a computer', () => {
   test('the site list adds up', async ({ page }) => {
     await page.goto(SITE);
     const listed = await page.locator('#sites .menu a').count();
-    await expect(page.locator('.works')).toContainText(`and ${listed - 4} more sites`);
+    await expect(page.locator('.works')).toContainText(`Works on ${listed} sites, including`);
     await expect(page.locator('.menu-more summary')).toHaveText(`${listed - 12} more sites`);
   });
 });

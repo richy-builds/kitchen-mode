@@ -13,6 +13,7 @@ const BUILD = check ? read('./km.js').match(/build: '([\d-]+)'/)?.[1] ?? '' : ne
 const HANDLE = 'richyjudge';
 // Where the page is deployed. Link previews on X need the full address of og.png.
 const SITE_URL = 'https://kitchen-mode.vercel.app';
+const REPO_URL = 'https://github.com/richy-builds/kitchen-mode';
 // PostHog project (EU) for the anonymous usage counts. The key is public by design: it can send events, not read them.
 const POSTHOG_KEY = 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0';
 // Counts go through this site (see vercel.json), so ad blockers that block posthog.com let them through.
@@ -105,8 +106,6 @@ const sample = {
 const menuItem = ([name, url]) =>
   `<li><a href="${url}" target="_blank" rel="noopener"><span>${name}</span><i></i>${icon(TICK, 18, 2.8)}</a></li>`;
 
-const favicon ='data:image/svg+xml,' + encodeURIComponent(
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🍳</text></svg>');
 const handleLink = HANDLE ? `<a href="https://x.com/${HANDLE}">@${HANDLE}</a>` : '';
 const description = 'A free browser button for recipe pages. No clutter: each step a sentence at a time, big enough to read from across the kitchen, with timers you start with a tap.';
 
@@ -114,6 +113,9 @@ const description = 'A free browser button for recipe pages. No clutter: each st
 const icon = (paths, size, width = 2.4, extra = '') =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${extra}>${paths}</svg>`;
 const PAN = '<circle cx="9.5" cy="12" r="7.5"/><path d="M17 12h6"/><circle cx="9.5" cy="12" r="2.4" fill="currentColor" stroke="none"/>';
+const favicon = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" rx="6" fill="#d92d20"/>' +
+  `<g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" transform="translate(2 2.4) scale(.8)">${PAN.replace('currentColor', '#fff')}</g></svg>`);
 const CLOCK = '<circle cx="12" cy="13.5" r="8"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5"/>';
 const TICK = '<path d="M4.5 12.5l5 5 10-11"/>';
 const CROSS = '<path d="M6 6l12 12M18 6L6 18"/>';
@@ -180,10 +182,10 @@ const page = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kitchen Mode</title>
+<title>Kitchen Mode: any recipe page, one big step at a time</title>
 <meta name="description" content="${description}">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Kitchen Mode">
+<meta property="og:title" content="Kitchen Mode: any recipe page, one big step at a time">
 <meta property="og:description" content="${description}">
 ${SITE_URL ? `<meta property="og:url" content="${SITE_URL}/">
 <meta property="og:image" content="${SITE_URL}/og.png">
@@ -332,8 +334,8 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   .t-head { display: flex; justify-content: space-between; gap: .75em; font: 400 .75em/1.333 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .t-rule { margin: .875em 0; border: 0; border-top: 2px dashed var(--rule-strong); }
   .t-eyebrow { margin-bottom: .77em; font: 700 .8125em/1.23 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
-  .t-step { display: grid; margin: 0; font-size: 2.25em; line-height: 1.12; font-weight: 800; letter-spacing: -.01em; }
-  .t-s { grid-area: 1 / 1; opacity: 0; transition: opacity .35s; }
+  .t-step { margin: 0; font-size: 2em; line-height: 1.1; font-weight: 800; letter-spacing: -.01em; text-wrap: pretty; }
+  .t-s { opacity: .5; transition: opacity .35s; }
   .t-s.on { opacity: 1; }
   .t-chip { padding: 0 .28em; border-radius: .3em; background: var(--amber-tint); white-space: nowrap; transition: background-color .2s, color .2s; }
   .t-chip.started { background: var(--amber); color: var(--on-amber); }
@@ -471,6 +473,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   .foot { background: var(--espresso); color: var(--espresso-soft); }
   .foot .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 32px; min-height: 140px; padding-block: 32px; font: 400 13px/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
   .foot a { color: var(--on-espresso); text-decoration: none; }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 8px 28px; }
   .foot a:hover { text-decoration: underline; }
 
   @media (min-width: 1200px) {
@@ -510,6 +513,15 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   @media (max-width: 719px) {
     .ticket-done { display: none; }
   }
+  /* One column: the ticket comes straight after the buttons (and the drag steps, on a mouse), so a phone's
+     first screen reaches it; the sites line and the phone note wait until after it. */
+  @media (max-width: 1199px) {
+    .hero { container-type: inline-size; }
+    .hero-copy { display: contents; }
+    .hero-copy > .kicker { order: 1; } .hero-copy > h1 { order: 2; } .hero-copy > .lede { order: 3; }
+    .hero-copy > .actions { order: 4; } .hero-copy > .install { order: 5; } .hero-copy > .tip { order: 6; }
+    .hero > .pass { order: 7; } .hero-copy > .phone-note { order: 8; } .hero-copy > .works { order: 9; }
+  }
   @media (max-width: 599px) {
     .kicker .long { display: none; }
     .kicker .short { display: inline; }
@@ -539,7 +551,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 <main>
 <div class="hero wrap">
   <div class="hero-copy">
-    <p class="kicker"><span class="tag">Free</span><span class="long">A button for your browser · No app, no account</span><span class="short">No app, no account</span></p>
+    <p class="kicker"><span class="tag">Free</span><span class="long">A button for any recipe page · No app, no account</span><span class="short">Any recipe page · No app</span></p>
     <h1>No clutter.<br> <em>Just the<br> next step.</em></h1>
     <p class="lede for-mouse">One click on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
     <p class="lede for-touch">One tap on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
@@ -548,6 +560,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
       <button class="button try" type="button" data-try>Try it on a sample recipe</button>
       <a class="button for-touch" href="#phone">Set it up on your phone</a>
     </div>
+    <p class="tip for-mouse" id="hint" aria-live="polite"></p>
     <div class="install for-mouse">
       <div class="mini" aria-hidden="true">
         <div class="mini-top"><i></i><i></i><i></i><b></b></div>
@@ -556,9 +569,8 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
       </div>
       <p><strong>Drag the Kitchen Mode ticket up onto your bookmarks bar.</strong> That’s the whole install. No bar? Press <span class="combo"><kbd data-mod>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span>.</p>
     </div>
-    <p class="tip for-mouse" id="hint" aria-live="polite"></p>
     <p class="phone-note for-touch">Phones and tablets have no bookmarks bar, so you paste a short code into a bookmark. It takes a couple of minutes, once.</p>
-    <p class="works">Works on ${proof.map(name => `<b>${name}</b>`).join(', ')} <a href="#sites">and ${tested.length - proof.length} more sites</a></p>
+    <p class="works">Works on <a href="#sites">${tested.length} sites</a>, including ${proof.slice(0, -1).map(name => `<b>${name}</b>`).join(', ')} and <b>${proof[proof.length - 1]}</b>.</p>
   </div>
 
   <figure class="pass" role="img" aria-label="Kitchen Mode showing step 3 of a stew recipe on an order ticket clipped to a steel rail: one sentence in large type, the ingredients it needs, and a running timer.">
@@ -576,7 +588,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
         <div class="t-head"><span>Smoky tomato &amp; butter bean stew</span><span>3/5</span></div>
         <hr class="t-rule">
         <div class="t-eyebrow">Step 3 of 5</div>
-        <p class="t-step"><span class="t-s on">Pour in the chopped tomatoes and stock, then tip in the butter beans. Bring to a simmer.</span><span class="t-s">Cook uncovered for <span class="t-chip">⏱︎ 18–20 mins</span>, stirring occasionally, until the sauce is thick enough to coat a spoon.</span></p>
+        <p class="t-step"><span class="t-s on">Pour in the chopped tomatoes and stock, then tip in the butter beans. Bring to a simmer.</span> <span class="t-s">Cook uncovered for <span class="t-chip">⏱︎ 18–20 mins</span>, stirring occasionally, until the sauce is thick enough to coat a spoon.</span></p>
         <hr class="t-rule">
         <div class="t-label">You’ll need</div>
         <div class="t-needs">
@@ -594,8 +606,8 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
   <h2 class="vh" id="features-title">What it does</h2>
   <ol class="wrap">
     <li><span class="num" aria-hidden="true">01</span><h3>Just the recipe</h3><p>No ads, pop-ups or life story. It reads the recipe itself, not the page around it.</p></li>
-    <li><span class="num" aria-hidden="true">02</span><h3>One sentence at a time</h3><p>Set big enough to read from the hob, with the ingredients that sentence needs beside it.</p></li>
-    <li><span class="num" aria-hidden="true">03</span><h3>Timers on tap</h3><p>Tap “cook for 8–10 mins” and an 8-minute timer starts. It rings until you stop it, even if you close Kitchen Mode.</p></li>
+    <li><span class="num" aria-hidden="true">02</span><h3>One line at a time</h3><p>Set big enough to read from the hob, with the ingredients that sentence needs beside it and a note of anything that should already be done.</p></li>
+    <li><span class="num" aria-hidden="true">03</span><h3>Timers on tap</h3><p>Tap “cook for 8–10 mins” and an 8-minute timer starts, fills the screen while you wait, and rings until you stop it.</p></li>
     <li><span class="num" aria-hidden="true">04</span><h3>Screen stays on</h3><p>No wiping flour off the screen to wake it up. Move on with a tap, a key, a swipe or a foot pedal.</p></li>
   </ol>
 </section>
@@ -722,7 +734,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 <footer class="foot">
   <div class="wrap">
     <span>Kitchen Mode · Free · Runs in your browser. Sends one anonymous count per use: the site’s name and whether it found a recipe</span>
-    ${HANDLE ? `<a href="https://x.com/${HANDLE}">Made by @${HANDLE}</a>` : ''}
+    <span class="foot-links">${REPO_URL ? `<a href="${REPO_URL}#decisions">Why it’s built this way</a>` : ''}${HANDLE ? `<a href="https://x.com/${HANDLE}">Made by @${HANDLE}</a>` : ''}</span>
   </div>
 </footer>
 
@@ -845,6 +857,8 @@ document.getElementById('copy').addEventListener('click', function () {
 });
 
 // The ticket in the hero plays through one step: next sentence, then a timer gets tapped.
+// Both sentences are painted from the start (the current one in ink, the other dimmed), so the
+// longer second sentence never becomes a new, later largest contentful paint.
 (function () {
   var ticket = document.querySelector('.ticket-live');
   var beats = ticket.querySelectorAll('.t-s');

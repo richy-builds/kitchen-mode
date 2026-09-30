@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kitchen Mode</title>
+<title>Kitchen Mode: any recipe page, one big step at a time</title>
 <meta name="description" content="A free browser button for recipe pages. No clutter: each step a sentence at a time, big enough to read from across the kitchen, with timers you start with a tap.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Kitchen Mode">
+<meta property="og:title" content="Kitchen Mode: any recipe page, one big step at a time">
 <meta property="og:description" content="A free browser button for recipe pages. No clutter: each step a sentence at a time, big enough to read from across the kitchen, with timers you start with a tap.">
 <meta property="og:url" content="https://kitchen-mode.vercel.app/">
 <meta property="og:image" content="https://kitchen-mode.vercel.app/og.png">
@@ -17,7 +17,7 @@
 <meta name="twitter:creator" content="@richyjudge">
 <meta name="theme-color" content="#fbf7f0" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#15120e" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%F0%9F%8D%B3%3C%2Ftext%3E%3C%2Fsvg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%23d92d20%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22%20transform%3D%22translate(2%202.4)%20scale(.8)%22%3E%3Ccircle%20cx%3D%229.5%22%20cy%3D%2212%22%20r%3D%227.5%22%2F%3E%3Cpath%20d%3D%22M17%2012h6%22%2F%3E%3Ccircle%20cx%3D%229.5%22%20cy%3D%2212%22%20r%3D%222.4%22%20fill%3D%22%23fff%22%20stroke%3D%22none%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,800&family=Atkinson+Hyperlegible+Next:wght@400;700;800&family=IBM+Plex+Mono:wght@400;600;700&display=swap">
@@ -155,8 +155,8 @@
   .t-head { display: flex; justify-content: space-between; gap: .75em; font: 400 .75em/1.333 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   .t-rule { margin: .875em 0; border: 0; border-top: 2px dashed var(--rule-strong); }
   .t-eyebrow { margin-bottom: .77em; font: 700 .8125em/1.23 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
-  .t-step { display: grid; margin: 0; font-size: 2.25em; line-height: 1.12; font-weight: 800; letter-spacing: -.01em; }
-  .t-s { grid-area: 1 / 1; opacity: 0; transition: opacity .35s; }
+  .t-step { margin: 0; font-size: 2em; line-height: 1.1; font-weight: 800; letter-spacing: -.01em; text-wrap: pretty; }
+  .t-s { opacity: .5; transition: opacity .35s; }
   .t-s.on { opacity: 1; }
   .t-chip { padding: 0 .28em; border-radius: .3em; background: var(--amber-tint); white-space: nowrap; transition: background-color .2s, color .2s; }
   .t-chip.started { background: var(--amber); color: var(--on-amber); }
@@ -294,6 +294,7 @@
   .foot { background: var(--espresso); color: var(--espresso-soft); }
   .foot .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 32px; min-height: 140px; padding-block: 32px; font: 400 13px/1.6 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
   .foot a { color: var(--on-espresso); text-decoration: none; }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 8px 28px; }
   .foot a:hover { text-decoration: underline; }
 
   @media (min-width: 1200px) {
@@ -333,6 +334,15 @@
   @media (max-width: 719px) {
     .ticket-done { display: none; }
   }
+  /* One column: the ticket comes straight after the buttons (and the drag steps, on a mouse), so a phone's
+     first screen reaches it; the sites line and the phone note wait until after it. */
+  @media (max-width: 1199px) {
+    .hero { container-type: inline-size; }
+    .hero-copy { display: contents; }
+    .hero-copy > .kicker { order: 1; } .hero-copy > h1 { order: 2; } .hero-copy > .lede { order: 3; }
+    .hero-copy > .actions { order: 4; } .hero-copy > .install { order: 5; } .hero-copy > .tip { order: 6; }
+    .hero > .pass { order: 7; } .hero-copy > .phone-note { order: 8; } .hero-copy > .works { order: 9; }
+  }
   @media (max-width: 599px) {
     .kicker .long { display: none; }
     .kicker .short { display: inline; }
@@ -362,7 +372,7 @@
 <main>
 <div class="hero wrap">
   <div class="hero-copy">
-    <p class="kicker"><span class="tag">Free</span><span class="long">A button for your browser · No app, no account</span><span class="short">No app, no account</span></p>
+    <p class="kicker"><span class="tag">Free</span><span class="long">A button for any recipe page · No app, no account</span><span class="short">Any recipe page · No app</span></p>
     <h1>No clutter.<br> <em>Just the<br> next step.</em></h1>
     <p class="lede for-mouse">One click on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
     <p class="lede for-touch">One tap on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
@@ -371,6 +381,7 @@
       <button class="button try" type="button" data-try>Try it on a sample recipe</button>
       <a class="button for-touch" href="#phone">Set it up on your phone</a>
     </div>
+    <p class="tip for-mouse" id="hint" aria-live="polite"></p>
     <div class="install for-mouse">
       <div class="mini" aria-hidden="true">
         <div class="mini-top"><i></i><i></i><i></i><b></b></div>
@@ -379,9 +390,8 @@
       </div>
       <p><strong>Drag the Kitchen Mode ticket up onto your bookmarks bar.</strong> That’s the whole install. No bar? Press <span class="combo"><kbd data-mod>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span>.</p>
     </div>
-    <p class="tip for-mouse" id="hint" aria-live="polite"></p>
     <p class="phone-note for-touch">Phones and tablets have no bookmarks bar, so you paste a short code into a bookmark. It takes a couple of minutes, once.</p>
-    <p class="works">Works on <b>BBC Good Food</b>, <b>Allrecipes</b>, <b>RecipeTin Eats</b>, <b>Serious Eats</b> <a href="#sites">and 69 more sites</a></p>
+    <p class="works">Works on <a href="#sites">73 sites</a>, including <b>BBC Good Food</b>, <b>Allrecipes</b>, <b>RecipeTin Eats</b> and <b>Serious Eats</b>.</p>
   </div>
 
   <figure class="pass" role="img" aria-label="Kitchen Mode showing step 3 of a stew recipe on an order ticket clipped to a steel rail: one sentence in large type, the ingredients it needs, and a running timer.">
@@ -399,7 +409,7 @@
         <div class="t-head"><span>Smoky tomato &amp; butter bean stew</span><span>3/5</span></div>
         <hr class="t-rule">
         <div class="t-eyebrow">Step 3 of 5</div>
-        <p class="t-step"><span class="t-s on">Pour in the chopped tomatoes and stock, then tip in the butter beans. Bring to a simmer.</span><span class="t-s">Cook uncovered for <span class="t-chip">⏱︎ 18–20 mins</span>, stirring occasionally, until the sauce is thick enough to coat a spoon.</span></p>
+        <p class="t-step"><span class="t-s on">Pour in the chopped tomatoes and stock, then tip in the butter beans. Bring to a simmer.</span> <span class="t-s">Cook uncovered for <span class="t-chip">⏱︎ 18–20 mins</span>, stirring occasionally, until the sauce is thick enough to coat a spoon.</span></p>
         <hr class="t-rule">
         <div class="t-label">You’ll need</div>
         <div class="t-needs">
@@ -417,8 +427,8 @@
   <h2 class="vh" id="features-title">What it does</h2>
   <ol class="wrap">
     <li><span class="num" aria-hidden="true">01</span><h3>Just the recipe</h3><p>No ads, pop-ups or life story. It reads the recipe itself, not the page around it.</p></li>
-    <li><span class="num" aria-hidden="true">02</span><h3>One sentence at a time</h3><p>Set big enough to read from the hob, with the ingredients that sentence needs beside it.</p></li>
-    <li><span class="num" aria-hidden="true">03</span><h3>Timers on tap</h3><p>Tap “cook for 8–10 mins” and an 8-minute timer starts. It rings until you stop it, even if you close Kitchen Mode.</p></li>
+    <li><span class="num" aria-hidden="true">02</span><h3>One line at a time</h3><p>Set big enough to read from the hob, with the ingredients that sentence needs beside it and a note of anything that should already be done.</p></li>
+    <li><span class="num" aria-hidden="true">03</span><h3>Timers on tap</h3><p>Tap “cook for 8–10 mins” and an 8-minute timer starts, fills the screen while you wait, and rings until you stop it.</p></li>
     <li><span class="num" aria-hidden="true">04</span><h3>Screen stays on</h3><p>No wiping flour off the screen to wake it up. Move on with a tap, a key, a swipe or a foot pedal.</p></li>
   </ol>
 </section>
@@ -660,7 +670,7 @@
 <footer class="foot">
   <div class="wrap">
     <span>Kitchen Mode · Free · Runs in your browser. Sends one anonymous count per use: the site’s name and whether it found a recipe</span>
-    <a href="https://x.com/richyjudge">Made by @richyjudge</a>
+    <span class="foot-links"><a href="https://github.com/richy-builds/kitchen-mode#decisions">Why it’s built this way</a><a href="https://x.com/richyjudge">Made by @richyjudge</a></span>
   </div>
 </footer>
 
@@ -1413,6 +1423,8 @@ document.getElementById('copy').addEventListener('click', function () {
 });
 
 // The ticket in the hero plays through one step: next sentence, then a timer gets tapped.
+// Both sentences are painted from the start (the current one in ink, the other dimmed), so the
+// longer second sentence never becomes a new, later largest contentful paint.
 (function () {
   var ticket = document.querySelector('.ticket-live');
   var beats = ticket.querySelectorAll('.t-s');
