@@ -1,6 +1,13 @@
 // Builds index.html: the Kitchen Mode landing page, with the button to drag onto the bookmarks bar,
 // and km.js: the same code as a file, which the bookmark loads.
+// `node build.mjs --check` writes nothing and fails if the committed files don't match the source.
 import { readFileSync, writeFileSync } from 'node:fs';
+import { tested, testedOn, featured, proof } from './sites.mjs';
+
+const check = process.argv.includes('--check');
+const read = file => { try { return readFileSync(new URL(file, import.meta.url), 'utf8'); } catch { return ''; } };
+// The build date goes out with every open's count. --check reuses the committed one, so it passes on any day.
+const BUILD = check ? read('./km.js').match(/build: '([\d-]+)'/)?.[1] ?? '' : new Date().toISOString().slice(0, 10);
 
 // Your X handle without the @. Leave empty to keep the credit off the page.
 const HANDLE = 'richyjudge';
@@ -14,12 +21,21 @@ const COUNT_URL = SITE_URL + '/relay/i/v0/e/';
 const source = readFileSync(new URL('./kitchen-mode.js', import.meta.url), 'utf8')
   .replace('%COUNT_URL%', COUNT_URL)
   .replace('%POSTHOG_KEY%', POSTHOG_KEY)
-  .replace('%BUILD%', new Date().toISOString().slice(0, 10))
+  .replace('%BUILD%', BUILD)
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .split('\n')
   .map(line => line.trim())
   .filter(line => line && !line.startsWith('//'))
-  .join('\n');
+  .join('\n')
+  // A script served without a charset is read in the page's own encoding, which isn't always UTF-8, and one mangled
+  // "½" stops the whole file parsing. So km.js is written as ASCII, with anything else as a \u escape.
+  .replace(/[^\x00-\x7f]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+// The comment stripping above is plain text matching, so a "/*" or "//" inside a string or regex would cut code out.
+// Every bookmark runs km.js as soon as it's pushed, so refuse to write one that doesn't parse.
+try { new Function(source); } catch (e) {
+  console.error(`km.js would not parse after stripping comments: ${e.message}`);
+  process.exit(1);
+}
 
 // The bookmark, on computers and phones alike, is a short loader for km.js (the same code) from this site, so
 // everyone runs the current build. Pasting 34 KB of code into a phone bookmark didn't survive, and a short one can be
@@ -86,88 +102,6 @@ const sample = {
   ].map(text => ({ '@type': 'HowToStep', text })),
 };
 
-// Recipe pages checked to publish the data Kitchen Mode reads (see README).
-const testedOn = '27 Sep 2026';
-const tested = [
-  ['Allrecipes', 'https://www.allrecipes.com/recipe/10813/best-chocolate-chip-cookies/'],
-  ['Barefoot Contessa', 'https://barefootcontessa.com/recipes/cheddar-corn-chowder'],
-  ['BBC Food', 'https://www.bbc.co.uk/food/recipes/easy_chocolate_cake_31070'],
-  ['BBC Good Food', 'https://www.bbcgoodfood.com/recipes/bacon-mushroom-risotto'],
-  ['Betty Crocker', 'https://www.bettycrocker.com/recipes/gluten-free-bisquick-chocolate-chip-blondies/a0a39dd2-dbba-4731-8904-bb9f4faa588c'],
-  ['Bon Appétit', 'https://www.bonappetit.com/recipe/bas-best-chocolate-chip-cookies'],
-  ['BOSH!', 'https://bosh.tv/recipes/gochujang-pasta-bake'],
-  ['Budget Bytes', 'https://www.budgetbytes.com/overnight-oats-base-recipe-plus-variations/'],
-  ['Cafe Delites', 'https://cafedelites.com/easy-chicken-burrito-recipe/'],
-  ['Cookie and Kate', 'https://cookieandkate.com/mediterranean-quinoa-salad-recipe/'],
-  ['Cooking Classy', 'https://www.cookingclassy.com/olive-garden-pasta-e-fagioli-soup-copycat-recipe/'],
-  ['Country Living', 'https://www.countryliving.com/food-drinks/a40992937/apple-cider-donut-bundt-cake-recipe/'],
-  ['Damn Delicious', 'https://damndelicious.net/2013/12/04/starbucks-pumpkin-scones-copycat-recipe/'],
-  ['Delicious Magazine', 'https://www.deliciousmagazine.co.uk/recipes/sloe-gin-bramble-pie/'],
-  ['delicious. (Australia)', 'https://www.delicious.com.au/recipes/spaghetti-bolognese-frittata/c316da71-1fe6-47f2-9338-f25c12a008ec'],
-  ['Deliciously Ella', 'https://www.deliciouslyella.com/recipes/creamy-kale-and-sweet-potato-salad'],
-  ['Delish', 'https://www.delish.com/cooking/recipe-ideas/a19636089/creamy-tuscan-chicken-recipe/'],
-  ['Downshiftology', 'https://downshiftology.com/recipes/fall-roasted-vegetables/'],
-  ['Epicurious', 'https://www.epicurious.com/recipes/food/views/ba-syn-quick-butter-braised-tomatoes-and-dumplings'],
-  ['Food & Wine', 'https://www.foodandwine.com/johns-old-fashioned-cocktail-recipe-12067792'],
-  ['Food Network', 'https://www.foodnetwork.com/recipes/ina-garten/perfect-roast-chicken-recipe-1940592'],
-  ['Food.com', 'https://www.food.com/recipe/ground-beef-gyros-30081'],
-  ['Food52', 'https://food52.com/recipes/93466-makers-mark-46-gold-rush-cocktail-recipe'],
-  ['GialloZafferano', 'https://www.giallozafferano.com/recipes/tomato-risotto-with-broccoli-and-mushrooms.html'],
-  ['Gimme Some Oven', 'https://www.gimmesomeoven.com/potsticker-soup-recipe/'],
-  ['Good Housekeeping', 'https://www.goodhousekeeping.com/food-recipes/party-ideas/a73553866/honey-deuce-mocktail/'],
-  ['Great British Chefs', 'https://www.greatbritishchefs.com/recipes/lamb-kimchi-cheese-toastie-recipe'],
-  ['Half Baked Harvest', 'https://www.halfbakedharvest.com/korean-bulgogi-bbq-beef-bowls/'],
-  ['Hebbar’s Kitchen', 'https://hebbarskitchen.com/veg-burnt-garlic-fried-rice-recipe/'],
-  ['HelloFresh', 'https://www.hellofresh.com/recipes/beef-with-cheddar-gouda-fondue-61f051cc17c4db690168e112'],
-  ['Jamie Oliver', 'https://www.jamieoliver.com/recipes/chicken/chicken-tikka-masala/'],
-  ['Joshua Weissman', 'https://www.joshuaweissman.com/recipes/the-best-nyc-bodega-chopped-cheese-sandwich-recipe'],
-  ['Just One Cookbook', 'https://www.justonecookbook.com/teriyaki-salmon-recipe/'],
-  ['King Arthur Baking', 'https://www.kingarthurbaking.com/recipes/classic-chocolate-chip-cookies-recipe'],
-  ['Kitchen Sanctuary', 'https://www.kitchensanctuary.com/potato-bacon-hash/'],
-  ['Love and Lemons', 'https://www.loveandlemons.com/apple-bread-recipe/'],
-  ['Maangchi', 'https://www.maangchi.com/recipe/kkeopjilkong-maneul-bokkeum'],
-  ['Martha Stewart', 'https://www.marthastewart.com/spiced-pumpkin-seeds-recipe-12076157'],
-  ['McCormick', 'https://www.mccormick.com/blogs/recipes/creamy-tuscan-chicken-pasta'],
-  ['Minimalist Baker', 'https://minimalistbaker.com/honey-almond-snack-cake/'],
-  ['Mob', 'https://www.mob.co.uk/recipes/fragrant-lime-coconut-prawn-pork-noodle-salad'],
-  ['Natasha’s Kitchen', 'https://natashaskitchen.com/chicken-tortilla-soup-recipe/'],
-  ['Oh She Glows', 'https://ohsheglows.com/my-new-cookbook-oh-she-glows-salads-is-here/'],
-  ['Olive', 'https://www.olivemagazine.com/recipes/baking-and-desserts/salted-maple-latte-tart/'],
-  ['Once Upon a Chef', 'https://www.onceuponachef.com/recipes/old-fashioned-baked-apples.html'],
-  ['Ottolenghi', 'https://ottolenghi.co.uk/pages/recipes/leek-lamb-stuffed-batbout'],
-  ['Pillsbury', 'https://www.pillsbury.com/recipes/classic-chicken-pot-pie/1401d418-ac0b-4b50-ad09-c6f1243fb992'],
-  ['Pinch of Nom', 'https://pinchofnom.com/recipes/air-fryer-chipotle-popcorn-chicken/'],
-  ['Pinch of Yum', 'https://pinchofyum.com/the-best-soft-chocolate-chip-cookies'],
-  ['Preppy Kitchen', 'https://preppykitchen.com/peanut-butter-cookies-recipe/'],
-  ['Real Simple', 'https://www.realsimple.com/maple-tahini-rice-krispies-treats-recipe-12023917'],
-  ['Recipe This', 'https://recipethis.com/air-fryer-frozen-fish-and-chips/'],
-  ['RecipeTin Eats', 'https://www.recipetineats.com/chicken-chasseur/'],
-  ['Ricardo', 'https://www.ricardocuisine.com/en/recipes/10975-apple-upside-down-cake'],
-  ['Sainsbury’s Magazine', 'https://www.sainsburysmagazine.co.uk/recipes/mains/aubergine-pomegranate-molasses-and-walnut-stew'],
-  ['Sally’s Baking Addiction', 'https://sallysbakingaddiction.com/chewy-chocolate-chip-cookies/'],
-  ['Serious Eats', 'https://www.seriouseats.com/the-food-lab-best-chocolate-chip-cookie-recipe'],
-  ['Simply Recipes', 'https://www.simplyrecipes.com/recipes/banana_bread/'],
-  ['Southern Living', 'https://www.southernliving.com/recipes/mini-pumpkin-cheesecakes'],
-  ['Spend With Pennies', 'https://www.spendwithpennies.com/burger-bowl-recipe/'],
-  ['Supergolden Bakes', 'https://www.supergoldenbakes.com/chicken-alfredo-recipe/'],
-  ['Swasthi’s Recipes', 'https://www.indianhealthyrecipes.com/aloo-gobi-recipe/'],
-  ['Taming Twins', 'https://www.tamingtwins.com/lamb-koftas-recipe/'],
-  ['taste.com.au', 'https://www.taste.com.au/recipes/spinach-lentil-gozleme-inspired-pasta-bake-recipe/5037n9c2'],
-  ['Tastes Better From Scratch', 'https://tastesbetterfromscratch.com/bread-recipe/'],
-  ['Tasting Table', 'https://www.tastingtable.com/1227986/small-batch-tomato-passata-recipe/'],
-  ['Tasty', 'https://tasty.co/recipe/the-best-chewy-chocolate-chip-cookies'],
-  ['The Guardian', 'https://www.theguardian.com/food/2026/sep/26/cooking-with-tom-kerridge-the-michelin-meatfluencer-venison-chilli-recipe'],
-  ['The Pioneer Woman', 'https://www.thepioneerwoman.com/food-cooking/recipes/a64040355/oatmeal-raisin-cookies-recipe/'],
-  ['The Recipe Critic', 'https://therecipecritic.com/jalapeno-poppers-recipe/'],
-  ['Veg Recipes of India', 'https://www.vegrecipesofindia.com/rajma-masala-recipe/'],
-  ['Waitrose', 'https://www.waitrose.com/ecom/recipe/creamy-corn-pasta'],
-  ['Well Plated', 'https://www.wellplated.com/crockpot-potato-soup-recipe/'],
-];
-// Shown on the ticket; the rest sit behind "N more sites".
-const featured = new Set(['Allrecipes', 'BBC Good Food', 'BBC Food', 'Bon Appétit', 'Epicurious', 'Food Network',
-  'Jamie Oliver', 'RecipeTin Eats', 'Sally’s Baking Addiction', 'Serious Eats', 'Simply Recipes', 'Tasty']);
-// Named in the hero, so people see sites they know before they scroll.
-const proof = ['BBC Good Food', 'Allrecipes', 'RecipeTin Eats', 'Serious Eats'];
 const menuItem = ([name, url]) =>
   `<li><a href="${url}" target="_blank" rel="noopener"><span>${name}</span><i></i>${icon(TICK, 18, 2.8)}</a></li>`;
 
@@ -953,7 +887,17 @@ document.getElementById('copy').addEventListener('click', function () {
 </html>
 `;
 
-writeFileSync(new URL('./index.html', import.meta.url), page);
-writeFileSync(new URL('./km.js', import.meta.url), source + '\n');
-console.log(`index.html written (page ${(page.length / 1024).toFixed(1)} KB)`);
-console.log(`km.js written (${(source.length / 1024).toFixed(1)} KB, loaded by the ${loader.length}-character bookmark)`);
+const out = { 'index.html': page, 'km.js': source + '\n' };
+if (check) {
+  // Vercel serves the committed files as they are, so a source change pushed without rebuilding never ships.
+  const stale = Object.keys(out).filter(file => read(`./${file}`) !== out[file]);
+  if (stale.length) {
+    console.error(`${stale.join(' and ')} ${stale.length > 1 ? "don't" : "doesn't"} match the source. Run node build.mjs and commit the result.`);
+    process.exit(1);
+  }
+  console.log(`index.html and km.js match the source (build ${BUILD})`);
+} else {
+  for (const [file, text] of Object.entries(out)) writeFileSync(new URL(`./${file}`, import.meta.url), text);
+  console.log(`index.html written (page ${(page.length / 1024).toFixed(1)} KB)`);
+  console.log(`km.js written (${(source.length / 1024).toFixed(1)} KB, loaded by the ${loader.length}-character bookmark)`);
+}

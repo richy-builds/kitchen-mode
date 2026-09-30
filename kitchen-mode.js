@@ -383,7 +383,7 @@
     },
       h('span', { class: 'label' }, label),
       t.time,
-      h('button', { class: 'cancel', title: 'Cancel timer', onclick: e => { e.stopPropagation(); removeTimer(t); } }, '✕'));
+      h('button', { class: 'cancel', title: 'Cancel timer', 'aria-label': 'Cancel timer', onclick: e => { e.stopPropagation(); removeTimer(t); } }, '✕'));
     timers.push(t);
     tray.append(t.el);
     syncChips();
@@ -427,7 +427,7 @@
       before.length > 0 && h('div', { class: 'before' }, h('div', { class: 'stub' },
         h('div', { class: 'eyebrow' }, 'Before you start'),
         h('ul', {}, before.map(b => h('li', {}, h('span', { class: 'tag' }, b.tag), h('span', {}, b.body)))))),
-      ingredients.length && [
+      ingredients.length > 0 && [
         h('div', { class: 'eyebrow' }, 'Ingredients', h('span', { class: 'soft' }, ' · tap to tick off')),
         h('ul', { class: 'ings' }, ingredients.map((ing, i) => h('li', {
           class: ticked.has(i) ? 'ticked' : '',
@@ -484,7 +484,7 @@
     h('header', {},
       h('div', { class: 'title' }, '🍳 ', title),
       pill,
-      h('button', { class: 'x', title: 'Close (Esc)', onclick: () => close() }, '✕')),
+      h('button', { class: 'x', title: 'Close (Esc)', 'aria-label': 'Close', onclick: () => close() }, '✕')),
     h('div', { class: 'progress' }, bars),
     stage,
     h('footer', {},
@@ -655,7 +655,7 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 .ring .g-small, .mini .big-again { display:none; }
 @media (max-height: 520px) { .wait .g-next { display:none; } }
 @keyframes fade { from { opacity:0; } }
-@media (prefers-reduced-motion: reduce) { .glance { animation:none; } }
+@media (prefers-reduced-motion: reduce) { .glance, .timer.ringing { animation:none; } }
 .reopen { display:none; }
 .km.mini { position:static; display:block; background:none; }
 .mini header, .mini .progress, .mini .stage, .mini .hint, .mini .glance { display:none; }

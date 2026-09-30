@@ -737,7 +737,7 @@ if (text) steps.push({ text, section });
 walk(instructions, '');
 return steps;
 };
-const splitSentences = text => text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(“‘])/).reduce((out, s) => {
+const splitSentences = text => text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(\u201c\u2018])/).reduce((out, s) => {
 if (out.length && s.length < 25) out[out.length - 1] += ' ' + s;
 else out.push(s);
 return out;
@@ -746,9 +746,9 @@ const NUMBER_WORDS = {
 a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
 fifteen: 15, twenty: 20, thirty: 30, forty: 40, 'forty-five': 45, 'half a': 0.5, 'half an': 0.5,
 };
-const FRACTIONS = { '½': 0.5, '¼': 0.25, '¾': 0.75, '1/2': 0.5, '1/4': 0.25, '3/4': 0.75 };
+const FRACTIONS = { '\u00bd': 0.5, '\u00bc': 0.25, '\u00be': 0.75, '1/2': 0.5, '1/4': 0.25, '3/4': 0.75 };
 const UNIT = { s: 1, m: 60, h: 3600 };
-const TIME_RE = /(?<![\w./])((?:\d+(?:\.\d+)?(?!\/))?\s*(?:[½¼¾]|[13]\/[24])|\d+(?:\.\d+)?|half an?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|–|—|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b(?:\s+(and a half)\b|\s+(?:and\s+)?(\d+)\s*(secs?|seconds|min(?:ute)?s?)\b)?/gi;
+const TIME_RE = /(?<![\w./])((?:\d+(?:\.\d+)?(?!\/))?\s*(?:[\u00bd\u00bc\u00be]|[13]\/[24])|\d+(?:\.\d+)?|half an?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|\u2013|\u2014|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b(?:\s+(and a half)\b|\s+(?:and\s+)?(\d+)\s*(secs?|seconds|min(?:ute)?s?)\b)?/gi;
 const amount = s => {
 s = s.toLowerCase();
 if (s in NUMBER_WORDS) return NUMBER_WORDS[s];
@@ -766,10 +766,10 @@ beaten melted softened cubed shredded rinsed drained cooked uncooked boneless sk
 optional taste tbsp tsp tablespoon tablespoons teaspoon teaspoons cup cups can cans tin tins pack packs bunch
 bunches clove cloves rasher rashers sprig sprigs slice slices stick sticks piece pieces litre litres pint pints`
 .split(/\s+/));
-const keywords = s => [...new Set(s.toLowerCase().replace(/\([^()]*\)/g, ' ').replace(/\([^()]*\)/g, ' ').split(/[^a-zà-ÿ]+/)
+const keywords = s => [...new Set(s.toLowerCase().replace(/\([^()]*\)/g, ' ').replace(/\([^()]*\)/g, ' ').split(/[^a-z\u00e0-\u00ff]+/)
 .filter(w => w.length >= 3 && !STOP.has(w))
 .map(w => (w.length > 3 ? w.replace(/(?:es|s)$/, '') : w)))];
-const QTY_RE = /^([\d¼-¾⅓-⅞][\d¼-¾⅓-⅞.,/\-–\s]*(?:(?:kg|g|mg|ml|l|litres?|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|pints?)\b)?)\s*/i;
+const QTY_RE = /^([\d\u00bc-\u00be\u2153-\u215e][\d\u00bc-\u00be\u2153-\u215e.,/\-\u2013\s]*(?:(?:kg|g|mg|ml|l|litres?|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|pints?)\b)?)\s*/i;
 const formatIngredient = text => {
 const m = text.match(QTY_RE);
 return m ? [h('b', {}, m[1].trim()), ' ', text.slice(m[0].length)] : [text];
@@ -787,7 +787,7 @@ if (location.hostname) fetch('https://kitchen-mode.vercel.app/relay/i/v0/e/', {
 method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
 body: JSON.stringify({
 api_key: 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
-properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-09-29', loader,
+properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-09-30', loader,
 touch, $process_person_profile: false },
 }),
 }).catch(() => {});
@@ -803,7 +803,7 @@ yieldText && (/^\d+$/.test(yieldText) ? `Serves ${yieldText}` : clean(yieldText)
 prep && `Prep ${prep}`,
 cookTime && `Cook ${cookTime}`,
 !prep && !cookTime && total && `Total ${total}`,
-].filter(Boolean).join(' · ');
+].filter(Boolean).join(' \u00b7 ');
 const image = (() => {
 let i = [].concat(recipe.image || [])[0];
 if (i && typeof i === 'object') i = i.url || i.contentUrl;
@@ -830,7 +830,7 @@ const LONG_RE = /\bovernight\b|\b(?:the )?(?:day|night) before\b/i;
 const STORE_RE = /\b(?:store|storage|from frozen|leftovers|keeps?|reheat)\b/i;
 const WANTS_HOT = /\bpre-?heated\s+(oven|grill|broiler)\b|\b(oven|grill|broiler)\b[^.]{0,30}\bpre-?heated\b/i;
 const TURNS_ON = /\bpre-?heat(?!ed)|\bheat (?:the |your |an? )?(?:oven|grill|broiler)|\b(?:oven|grill|broiler)\s+(?:on\b|to\s+\d)|\bturn on (?:the )?(?:oven|grill)/i;
-const TEMP_RE = /\b\d{2,3}\s?°?\s?[CF]\b(?:\s?fan)?|\bgas(?: mark)? \d\b/i;
+const TEMP_RE = /\b\d{2,3}\s?\u00b0?\s?[CF]\b(?:\s?fan)?|\bgas(?: mark)? \d\b/i;
 const before = [];
 const readyIngs = ingredients.filter(i => READY_RE.test(i));
 readyIngs.forEach(i => before.push({ tag: 'Have ready', body: formatIngredient(i) }));
@@ -845,7 +845,7 @@ before.push({ tag: `Step ${si + 1} uses`, body: m[0].replace(/^(?:your|some)\s+/
 }
 const long = !waited.has(si) && !STORE_RE.test(sentence) && (LONG_RE.test(sentence) ||
 (WAIT_RE.test(sentence.split(/\buntil\b/i)[0]) && [...sentence.matchAll(TIME_RE)].some(m => toSeconds(m) >= 3600)));
-if (long) { waited.add(si); before.push({ tag: `Long wait · step ${si + 1}`, body: sentence }); }
+if (long) { waited.add(si); before.push({ tag: `Long wait \u00b7 step ${si + 1}`, body: sentence }); }
 earlier += ' ' + sentence;
 }));
 const hotStep = steps.findIndex(s => WANTS_HOT.test(s.text));
@@ -895,7 +895,7 @@ if (voiceReady) return;
 voiceReady = true;
 try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {}
 };
-const VERB_RE = /\b(bake|roast|boil|simmer|cook|fry|grill|griddle|broil|rest|chill|marinate|soak|steam|poach|blanch|toast|brown|sear|braise|reduce|stir|whisk|knead|prove|proof|rise|cool|stand|microwave|saut[eé]|caramelise|caramelize|soften|melt|bubble|char|freeze|steep|infuse|blitz|blend|mix|beat)(?:s|ing)?\b/gi;
+const VERB_RE = /\b(bake|roast|boil|simmer|cook|fry|grill|griddle|broil|rest|chill|marinate|soak|steam|poach|blanch|toast|brown|sear|braise|reduce|stir|whisk|knead|prove|proof|rise|cool|stand|microwave|saut[e\u00e9]|caramelise|caramelize|soften|melt|bubble|char|freeze|steep|infuse|blitz|blend|mix|beat)(?:s|ing)?\b/gi;
 const verbBefore = text => {
 const m = [...text.matchAll(VERB_RE)].pop();
 return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : '';
@@ -921,7 +921,7 @@ if (t.ringing && now - t.lastBeep > 2500) { t.lastBeep = now; beep(t.out); }
 const ringing = timers.some(t => t.ringing);
 if (ringing !== ringingTitle) {
 ringingTitle = ringing;
-document.title = ringing ? `⏰ Time's up! ${origTitle}` : origTitle;
+document.title = ringing ? `\u23f0 Time's up! ${origTitle}` : origTitle;
 }
 glanceTick(now);
 };
@@ -946,9 +946,9 @@ if (e?.type === 'pointerdown' && glance.contains(e.target)) return;
 lastTouch = Date.now();
 if (glancing === 'wait') hideGlance();
 };
-const sentenceAt = i => beats[i] ? steps[beats[i].si].sentences[beats[i].bi].replace(/(\d)\s*([–-])\s*(\d)/g, '$1⁠$2⁠$3') : '';
+const sentenceAt = i => beats[i] ? steps[beats[i].si].sentences[beats[i].bi].replace(/(\d)\s*([\u2013-])\s*(\d)/g, '$1\u2060$2\u2060$3') : '';
 const showNext = i => glanceNext.replaceChildren(...(beats[i] && i > 0 ? [
-h('span', { class: 'g-label' }, beats[i].si === beats[i - 1].si ? 'Next' : `Next · Step ${beats[i].si + 1}`), sentenceAt(i),
+h('span', { class: 'g-label' }, beats[i].si === beats[i - 1].si ? 'Next' : `Next \u00b7 Step ${beats[i].si + 1}`), sentenceAt(i),
 ] : []));
 const glanceTick = now => {
 const ring = minimised ? null : timers.filter(t => t.ringing).sort((a, b) => a.end - b.end)[0];
@@ -968,7 +968,7 @@ glanceNow.textContent = ring ? '' : sentenceAt(pos);
 showNext(from + 1);
 }
 glanceTime.textContent = ring ? "Time's up" : clock((first.end - now) / 1000);
-glanceMore.textContent = ring ? 'Tap to stop' : rest.map(t => `${t.label} ${clock((t.end - now) / 1000)}`).join('  ·  ');
+glanceMore.textContent = ring ? 'Tap to stop' : rest.map(t => `${t.label} ${clock((t.end - now) / 1000)}`).join('  \u00b7  ');
 };
 const syncChips = () => stage.querySelectorAll('.chip').forEach(c =>
 c.classList.toggle('started', timers.some(t => t.key === c.dataset.key)));
@@ -1002,7 +1002,7 @@ onclick: e => { e.stopPropagation(); if (t.ringing) removeTimer(t); else if (min
 },
 h('span', { class: 'label' }, label),
 t.time,
-h('button', { class: 'cancel', title: 'Cancel timer', onclick: e => { e.stopPropagation(); removeTimer(t); } }, '✕'));
+h('button', { class: 'cancel', title: 'Cancel timer', 'aria-label': 'Cancel timer', onclick: e => { e.stopPropagation(); removeTimer(t); } }, '\u2715'));
 timers.push(t);
 tray.append(t.el);
 syncChips();
@@ -1017,13 +1017,13 @@ const secs = Math.round(toSeconds(m));
 if (!(secs > 0)) continue;
 const key = `${si}.${bi}.${m.index}`;
 const verb = verbBefore(text.slice(0, m.index));
-const label = verb ? `Step ${si + 1} · ${verb}` : `Step ${si + 1}`;
+const label = verb ? `Step ${si + 1} \u00b7 ${verb}` : `Step ${si + 1}`;
 const speech = `${verb ? `${verb}, step` : 'Step'} ${si + 1}. Time's up.`;
 out.push(text.slice(last, m.index), h('button', {
 class: timers.some(t => t.key === key) ? 'chip started' : 'chip',
 'data-key': key,
 onclick: e => { e.stopPropagation(); startTimer(secs, label, key, speech); },
-}, '⏱︎ ', m[0]));
+}, '\u23f1\ufe0e ', m[0]));
 last = m.index + m[0].length;
 }
 out.push(text.slice(last));
@@ -1042,8 +1042,8 @@ meta && h('div', { class: 'meta' }, meta),
 before.length > 0 && h('div', { class: 'before' }, h('div', { class: 'stub' },
 h('div', { class: 'eyebrow' }, 'Before you start'),
 h('ul', {}, before.map(b => h('li', {}, h('span', { class: 'tag' }, b.tag), h('span', {}, b.body)))))),
-ingredients.length && [
-h('div', { class: 'eyebrow' }, 'Ingredients', h('span', { class: 'soft' }, ' · tap to tick off')),
+ingredients.length > 0 && [
+h('div', { class: 'eyebrow' }, 'Ingredients', h('span', { class: 'soft' }, ' \u00b7 tap to tick off')),
 h('ul', { class: 'ings' }, ingredients.map((ing, i) => h('li', {
 class: ticked.has(i) ? 'ticked' : '',
 onclick: e => {
@@ -1053,7 +1053,7 @@ e.currentTarget.classList.toggle('ticked');
 },
 }, h('span', { class: 'box' }), h('span', {}, formatIngredient(ing))))),
 ],
-h('button', { class: 'primary', onclick: e => { e.stopPropagation(); next(); } }, 'Start cooking →')),
+h('button', { class: 'primary', onclick: e => { e.stopPropagation(); next(); } }, 'Start cooking \u2192')),
 image && h('img', { class: 'hero', src: image, alt: '' }));
 const cooking = () => {
 const { si, bi } = beats[pos];
@@ -1061,7 +1061,7 @@ const step = steps[si];
 const need = neededFor(step.sentences[bi]);
 return h('section', { class: 'cook' },
 h('div', {},
-h('div', { class: 'eyebrow' }, `Step ${si + 1} of ${steps.length}`, step.section && ` · ${step.section}`),
+h('div', { class: 'eyebrow' }, `Step ${si + 1} of ${steps.length}`, step.section && ` \u00b7 ${step.section}`),
 h('p', { class: 'step', style: `font-size:${fontSize(step.text.length)}` },
 step.sentences.map((s, i) => [
 h('span', { class: i === bi ? 's on' : i < bi ? 's past' : 's' }, withTimers(s, si, i)), ' ',
@@ -1093,9 +1093,9 @@ const r = stage.getBoundingClientRect();
 });
 const root = h('div', { class: 'km' },
 h('header', {},
-h('div', { class: 'title' }, '🍳 ', title),
+h('div', { class: 'title' }, '\ud83c\udf73 ', title),
 pill,
-h('button', { class: 'x', title: 'Close (Esc)', onclick: () => close() }, '✕')),
+h('button', { class: 'x', title: 'Close (Esc)', 'aria-label': 'Close', onclick: () => close() }, '\u2715')),
 h('div', { class: 'progress' }, bars),
 stage,
 h('footer', {},
@@ -1103,8 +1103,8 @@ h('button', { class: 'reopen', onclick: e => { e.stopPropagation(); open(); } },
 tray,
 bigAgain,
 h('div', { class: 'hint' }, touch
-? 'Tap right → next · tap left ← back'
-: 'Space or tap → next · ← back · T timer · Esc close')),
+? 'Tap right \u2192 next \u00b7 tap left \u2190 back'
+: 'Space or tap \u2192 next \u00b7 \u2190 back \u00b7 T timer \u00b7 Esc close')),
 glance);
 const render = () => {
 stage.replaceChildren(pos < 0 ? overview() : pos >= beats.length ? finished() : cooking());
@@ -1120,7 +1120,7 @@ const next = () => { if (pos < beats.length) { pos++; render(); } };
 const back = () => { if (pos > -1) { pos--; render(); } };
 let lock = null, wantLock = true;
 const setAwake = on => {
-pill.textContent = on ? '☀︎ Screen stays on' : '☾ Screen may sleep';
+pill.textContent = on ? '\u2600\ufe0e Screen stays on' : '\u263e Screen may sleep';
 pill.classList.toggle('off', !on);
 };
 const getLock = async () => {
@@ -1255,7 +1255,7 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 .ring .g-small, .mini .big-again { display:none; }
 @media (max-height: 520px) { .wait .g-next { display:none; } }
 @keyframes fade { from { opacity:0; } }
-@media (prefers-reduced-motion: reduce) { .glance { animation:none; } }
+@media (prefers-reduced-motion: reduce) { .glance, .timer.ringing { animation:none; } }
 .reopen { display:none; }
 .km.mini { position:static; display:block; background:none; }
 .mini header, .mini .progress, .mini .stage, .mini .hint, .mini .glance { display:none; }
