@@ -40,9 +40,16 @@ Recipe sites publish a structured copy of each recipe ([schema.org Recipe](https
 | File | What it is |
 |---|---|
 | `kitchen-mode.js` | Readable source of the bookmarklet. Edit this one. |
-| `build.mjs` | Strips comments from the source and writes it to `km.js`, then builds `index.html`: the landing page with the bookmark (`loader`, a short `javascript:` URL that loads `km.js`) and the sample recipe, which "Try it" runs from a copy of the code inside the page. `HANDLE`, `SITE_URL` and `POSTHOG_KEY` are set at the top. |
+| `build.mjs` | Strips comments from the source and writes it to `km.js`, then builds `index.html`: the landing page with the bookmark (`loader`, a short `javascript:` URL that loads `km.js`) and the sample recipe, which "Try it" runs from a copy of the code inside the page. `HANDLE`, `SITE_URL` and `POSTHOG_KEY` are set at the top. `node build.mjs --check` writes nothing and fails if the committed files don't match the source. |
+| `sites.mjs` | The recipe sites checked to work (`tested`), the 12 `featured` on the landing page and the 4 named in the hero. |
 | `km.js` | Generated. The same code as a file, loaded by the bookmark on every click, on computers and phones. Don't edit by hand. |
-| `vercel.json` | Forwards `/relay/*` to PostHog's EU servers, so ad blockers that block posthog.com don't drop the counts. |
+| `vercel.json` | Forwards `/relay/*` to PostHog's EU servers, so ad blockers that block posthog.com don't drop the counts. Skips the install step, so `package.json` doesn't turn deploys into builds. |
+| `tests/` | Playwright tests, run offline against the built `km.js` and `index.html`. `serve.js` answers the site's requests from this checkout, and is shared with the scripts. |
+| `scripts/shots.mjs` | Screenshots of the landing page and cook view into `shots/` (not committed), and `og.png`. |
+| `scripts/check-sites.mjs` | Runs this checkout's `km.js` on real recipe pages and reports what it found. |
+| `package.json` | Dev tooling only: Playwright, pinned. No `build` script, since Vercel would run it. |
+| `CLAUDE.md`, `.claude/` | Instructions, hooks and skills for Claude Code (see [Working with Claude Code](#working-with-claude-code)). |
+| `.github/workflows/test.yml` | Runs `npm test` on pull requests and on main. |
 | `index.html` | The generated landing page. Don't edit by hand. |
 | `og.png` | Link preview image (1200×630) used by X and others. |
 | `og-image.html` | Source for `og.png`. |
@@ -51,15 +58,21 @@ Recipe sites publish a structured copy of each recipe ([schema.org Recipe](https
 ## Working on it
 
 ```sh
+npm install && npx playwright install chromium   # once
 node build.mjs     # rebuild index.html and km.js after changing kitchen-mode.js or build.mjs
+npm test           # the committed build matches the source, then the Playwright tests (offline, about 20 s)
+npm run shots      # screenshots of the landing page and cook view, phone and desktop, light and dark, in shots/
 open index.html    # "Try it on a sample recipe" runs the current code; index.html#test is the test recipe
 ```
 
-Regenerate the preview image after changing `og-image.html`:
+The tests run the real loader bookmark, read out of the built `index.html`, on made-up recipe pages in headless Chrome, with the site's requests answered from this checkout. Timers run on Playwright's fake clock, so a test can run one to the end and see the screen turn red. There are no retries: a test that only passes sometimes is a bug.
+
+`node scripts/check-sites.mjs` runs this checkout's `km.js` on every page in `sites.mjs` (or on the URLs given, and `--before` prints each "Before you start" list). It needs the internet, answers the counts itself so nothing reaches PostHog, and takes about two minutes.
+
+Regenerate the preview image after changing `og-image.html` (it refuses if the web fonts didn't load):
 
 ```sh
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
-  --virtual-time-budget=4000 --window-size=1200,630 --screenshot="$PWD/og.png" "file://$PWD/og-image.html"
+npm run shots -- og
 ```
 
 Test on Android in the emulator (a Pixel 8 with Android 17 and Chrome 145, from the Play Store image, so it's the real Chrome for Android):
@@ -71,13 +84,23 @@ adb reverse tcp:8765 tcp:8765 && python3 -m http.server 8765  # its Chrome can t
 
 `chrome://inspect` in Chrome on the Mac attaches DevTools to the emulator's tabs. `adb` is in `~/Library/Android/sdk/platform-tools`. It was installed with Homebrew (`openjdk@21`, `android-commandlinetools`), then `sdkmanager "platform-tools" "emulator" "system-images;android-37.0;google_apis_playstore;arm64-v8a"` and `avdmanager create avd -n kitchen_pixel -d pixel_8`. It isn't signed in to Google, so Chrome doesn't update and the Play Store can't install other browsers.
 
-Deploy by pushing `main`: Vercel's Git integration publishes it to production in about 30 seconds (static files, no build step on Vercel). Run `node build.mjs` and commit `index.html` and `km.js` first, since Vercel serves them as committed. Every bookmark loads `km.js` from the live site on each open, so a push reaches everyone at once (except computers set up before 30 Sep 2026, whose bookmarks hold the old full code). Check it landed:
+Deploy by pushing `main`: Vercel's Git integration publishes it to production in about 30 seconds (static files, no build step on Vercel). Run `npm test` and commit `index.html` and `km.js` first, since Vercel serves them as committed. The Test workflow runs the same checks on every pull request; with main protected to require it, a red build can't reach anyone. Every bookmark loads `km.js` from the live site on each open, so a push reaches everyone at once (except computers set up before 30 Sep 2026, whose bookmarks hold the old full code). Check it landed:
 
 ```sh
 git push origin main
 vercel ls                                                     # newest row: Production, Ready
 diff <(curl -s "https://kitchen-mode.vercel.app/km.js?v=$(date +%s)") km.js && echo live
 ```
+
+### Working with Claude Code
+
+`CLAUDE.md` holds the rules Claude can't work out from the code. Hooks in `.claude/settings.json` enforce the ones that matter most:
+
+- Editing `km.js` or `index.html` by hand is refused, with a pointer to the source. Editing `kitchen-mode.js` or `build.mjs` rebuilds both, and a build that wouldn't parse is reported straight away.
+- Anything that would update main (a push, or merging a pull request) asks first, since main is every user's copy.
+- Claude Code on the web runs `npm install` when a session starts, so the tests work from the first prompt.
+
+Two skills: `/ship` goes through the checks, pushes and checks the live copy; only you can start it. `/check-sites` re-runs the site check and updates the lists.
 
 ## Usage counts
 
@@ -106,9 +129,9 @@ Limits: copies installed before 27 Sep 2026 never report, since full-code bookma
 
 ## Site support
 
-Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup the bookmarklet uses. Sites that turn away plain requests were loaded in headless Chrome instead.
+Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup the bookmarklet uses. Sites that turn away plain requests were loaded in headless Chrome instead. `node scripts/check-sites.mjs` now does the whole check, running the bookmarklet itself.
 
-- **Publish the data (73 sites):** the list, with the recipe checked on each, lives in `tested` in `build.mjs`. The 12 names in `featured` show on the landing page; the rest sit behind "N more sites".
+- **Publish the data (73 sites):** the list, with the recipe checked on each, lives in `tested` in `sites.mjs`. The 12 names in `featured` show on the landing page; the rest sit behind "N more sites".
 - **Don't publish usable data:** Nigella, Mary Berry, Smitten Kitchen, Hairy Bikers, Rick Stein and Inspired Taste publish none; Gordon Ramsay publishes recipes without their steps
 - **Blocked even headless Chrome** (bot protection, so unknown rather than unsupported): Taste of Home, The Kitchn, The Woks of Life, Riverford, Coles
 - **No recipe page found to check:** EatingWell, Skinnytaste, Tesco Real Food, Donna Hay, Ambitious Kitchen (the crawl only reached collection pages)
@@ -135,6 +158,8 @@ Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup
 - **Landing page design: "The Pass".** Each recipe step is an order ticket clipped to the steel rail at a restaurant pass. The bookmarks bar is the rail, and installing means hanging the Kitchen Mode ticket on it. Cream ground, white tickets with a clip and drop shadow, tomato red (#d92d20) for actions, amber (#ffb020) for timers, espresso bands; steel is the only cool colour. Fonts are Archivo condensed for headings, IBM Plex Mono for labels and Atkinson Hyperlegible Next for body text (legibility is the point of the tool). The hero ticket plays through a step the way the real view does. Every text and background pair is at least 4.5:1, or 3:1 for text 24px and up, in light and dark mode.
 - **The tool's palette matches the landing page:** cream background, tomato red for the step counter, progress and buttons, amber chips for running timers with a light amber tint on tappable times, and "You'll need" and the finish screen as white ticket stubs. Labels (title bar, eyebrows, pills, timers, the serves and cooking-time line, key hints) use the system monospace font; the step text and headings are system-ui. Buttons match the landing page: 10px corners, red with a darker red shadow, or an ink outline. There are no web fonts in the tool, because they're unreliable on other sites' pages, and nothing is rotated or torn, because reading comes first. Ringing timers turn red, so the "screen may sleep" warning is an inverted ink pill instead. Dimmed sentences sit at 50–55% opacity so they still reach 3:1.
 - **The tool was restyled before launch, not after**, because installed bookmarklets never update: whatever look ships first is the one early users keep. It also means the ticket on the landing page shows what people actually get.
+- **km.js is written as ASCII** (30 Sep 2026). A script loaded without a charset in its `Content-Type` is read in the page's own encoding. On a Windows-1252 page, the "½" and "¼–¾" in the timer and quantity patterns turned into junk, one pattern stopped parsing and a click did nothing at all: no view, no message, no count, since the loader's message only covers a script that fails to load. The build now writes every non-ASCII character as a `\u` escape (0.3 KB more), so the page's encoding no longer matters, including for bookmarks already installed. Found by the tests, on a test page without a `<meta charset>`. Whether Vercel sends `charset=utf-8` with `km.js`, which would have hidden it on most sites, wasn't checked.
+- **Tests run the shipped files in a real browser, offline** (30 Sep 2026). A bug in a bookmarklet reaches everyone on the next click, and most of what matters here (glance mode, a timer ringing, the privacy promise, the loader's own code) only shows in a browser. So the Playwright tests click the real loader, read out of the built `index.html`, on made-up recipe pages, rather than testing the functions one by one, which would have meant splitting `kitchen-mode.js` into modules and a bundler. Writing them turned up the ASCII problem above, a stray "0" on the first screen of a recipe with no ingredient list, a ringing corner timer that kept pulsing with reduced motion on, and ✕ buttons whose only name for screen readers was the ✕ itself (now "Close" and "Cancel timer"). All four are fixed. The cost is a pinned dev dependency, which `vercel.json` keeps out of deploys. A test for each false alarm listed under "Before you start" guards the word lists.
 - **Name:** kept "Kitchen Mode" because it says what it does. "Recipease" was considered and dropped: it was Jamie Oliver's cookery shop brand, and it sounds identical to "recipes".
 
 ## Not yet tested
@@ -146,6 +171,7 @@ Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup
 - "Before you start", timer names, the spoken line and glance mode on a real phone, especially iOS Safari, which only speaks later if something was spoken during a tap (a silent line is spoken when a timer starts). Checked on 29 Sep 2026 in headless Chrome only: the list on a test recipe with every case and on 43 real recipe pages' data, the names, glance mode turning on after 10 idle seconds, and the spoken line.
 - The glance changes of 29 Sep 2026 on a real phone: the next sentence, "Keep timer small", the red ringing screen and the 90 seconds of booked rings. Checked in headless Chrome only, with a phone, a landscape phone and a computer in dark mode: 28 checks, including taps on the big timer not moving on, and the rings booked (108 beeps over 88 seconds).
 - The timer changes of 29 Sep 2026 on a real phone: the corner timers, and whether the new alarm carries over an extractor fan. Checked in headless Chrome only (duration parsing on 27 phrasings, one timer per time, the corner tray, reopening, Esc, and the audio booking).
+- The fixes of 30 Sep 2026 outside headless Chrome: the ASCII `km.js` on a real site that isn't UTF-8, the ringing corner timer holding still with reduced motion on, and the ✕ buttons' names in VoiceOver and TalkBack.
 - Whether any browser reports a drop on the bookmarks bar as anything but `none` in `drag_ended`: all 11 drags on 27 Sep 2026 reported `none`, so it may not tell a landed drop from a cancelled one even in Chrome
 
 ## Ideas

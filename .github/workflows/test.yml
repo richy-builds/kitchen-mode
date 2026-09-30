@@ -1,0 +1,31 @@
+# Vercel publishes main as committed, so this checks the committed km.js and index.html match the source and pass
+# the tests. To stop a red build reaching users, protect main so pull requests need this check to pass.
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - uses: actions/upload-artifact@v6
+        if: failure()
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

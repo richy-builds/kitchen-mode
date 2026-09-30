@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(node build.mjs)",
+      "Bash(node build.mjs --check)",
+      "Bash(npm test)",
+      "Bash(npm test *)",
+      "Bash(npx playwright test)",
+      "Bash(npx playwright test *)",
+      "Bash(npm run shots)",
+      "Bash(npm run shots *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git show *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+            "timeout": 300
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/generated-files.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__github__push_files|mcp__github__create_or_update_file|mcp__github__delete_file|mcp__github__merge_pull_request|mcp__github__enable_pr_auto_merge",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-main.mjs"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/generated-files.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

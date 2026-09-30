@@ -1,0 +1,16 @@
+{
+  "name": "kitchen-mode",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling only. Vercel serves the committed files as they are (see vercel.json), so there is deliberately no build script.",
+  "scripts": {
+    "test": "node build.mjs --check && playwright test",
+    "shots": "node scripts/shots.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

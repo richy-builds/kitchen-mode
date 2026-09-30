@@ -1,4 +1,5 @@
 {
+  "installCommand": "",
   "rewrites": [
     { "source": "/relay/:path(.*)", "destination": "https://eu.i.posthog.com/:path*" }
   ]
