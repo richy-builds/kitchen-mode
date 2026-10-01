@@ -100,7 +100,7 @@ return [hrs && `${hrs} hr`, mins % 60 && `${mins % 60} min`].filter(Boolean).joi
 const recipe = findRecipe();
 const steps = recipe ? getSteps(recipe.recipeInstructions).map(s => ({ ...s, sentences: splitSentences(s.text) })) : [];
 try {
-if (location.hostname) fetch('https://kitchen-mode.vercel.app/relay/i/v0/e/', {
+if (location.hostname) fetch('https://kitchen-mode.com/relay/i/v0/e/', {
 method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
 body: JSON.stringify({
 api_key: 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),

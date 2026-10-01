@@ -14,6 +14,6 @@ Shipping means main gets the change, by a push or a merged pull request. Vercel 
 5. If it changes what leaves the page (the count, its properties, any new request), stop and confirm with the user first. The privacy promise is on the landing page. Update README "Usage counts" and tests/privacy.spec.js with it.
 6. README: a dated entry under Decisions for anything people will notice (what changed, why, what was tried, what it costs), and anything checked only in headless Chrome under Not yet tested.
 7. Commit km.js and index.html with the source that made them, then push main or merge the pull request. The guard hook asks before anything updates main; that's expected, and the user answers it.
-8. Check it landed: `diff <(curl -s "https://kitchen-mode.vercel.app/km.js?v=$(date +%s)") km.js && echo live`. Claude Code on the web can't reach the live site. There, say so and give the user that command rather than saying it's live.
+8. Check it landed: `diff <(curl -s "https://kitchen-mode.com/km.js?v=$(date +%s)") km.js && echo live`. Claude Code on the web can't reach the live site. There, say so and give the user that command rather than saying it's live.
 
 $ARGUMENTS

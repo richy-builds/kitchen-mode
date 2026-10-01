@@ -4,7 +4,7 @@ A bookmarklet that turns a recipe page into a big, step-by-step cooking view, pl
 
 ## Main is production
 
-Every installed bookmark loads `km.js` from https://kitchen-mode.vercel.app on each click, and pushing main deploys in about 30 seconds. A push to main is a release to every user at once, on sites we don't control. Work on a branch, run `npm test` before any push, and only update main when the user asks (use the ship skill). A hook asks before anything updates main.
+Every installed bookmark loads `km.js` from https://kitchen-mode.com (or https://kitchen-mode.vercel.app, for bookmarks set up before 1 Oct 2026) on each click, and pushing main deploys in about 30 seconds. A push to main is a release to every user at once, on sites we don't control. Work on a branch, run `npm test` before any push, and only update main when the user asks (use the ship skill). A hook asks before anything updates main.
 
 ## Files
 
@@ -23,7 +23,7 @@ Every installed bookmark loads `km.js` from https://kitchen-mode.vercel.app on e
 
 - Fix bugs test-first: a test that fails, then the fix. Tests run against the built km.js, so the rebuild matters. Timer tests use Playwright's fake clock (see `tests/timers.spec.js`).
 - The privacy promise is exact: one count per open, with the site's hostname, whether it found a recipe, the build date, `loader` and `touch`. Adding a request or a property needs the user's say-so, plus updates to README "Usage counts" and `tests/privacy.spec.js`.
-- `/km.js` must stay at that URL forever, since installed bookmarks point there. The loader bookmark in `build.mjs` must stay ES5 with no `%` or `#`. Changing it only reaches new installs.
+- `/km.js` must stay at that path forever, on both kitchen-mode.com and kitchen-mode.vercel.app, since installed bookmarks point there. Keep the domain renewing and the vercel.app domain on the Vercel project. The loader bookmark in `build.mjs` must stay ES5 with no `%` or `#`. Changing it only reaches new installs.
 - The tool's CSS stays inside its shadow DOM. No web fonts in the tool, and respect `prefers-reduced-motion`.
 - Words people read are plain British English (hob, colour), in short sentences, matching the README and landing page. No jargon.
 - Anything people will notice gets a dated entry under README "Decisions" (what, why, what was tried, what it costs). Anything checked only in headless Chrome goes under "Not yet tested".

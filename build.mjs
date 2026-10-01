@@ -11,11 +11,10 @@ const BUILD = check ? read('./km.js').match(/build: '([\d-]+)'/)?.[1] ?? '' : ne
 
 // Your X handle without the @. Leave empty to keep the credit off the page.
 const HANDLE = 'richyjudge';
-// Where the code lives: the loader bookmark and the counts use this. It stays on vercel.app on purpose, so no installed
-// bookmark depends on a domain renewal. Never point it at PAGE_URL.
-const SITE_URL = 'https://kitchen-mode.vercel.app';
-// The page's public address, for link previews and anything that tells people where it lives. Link previews on X need the full address of og.png.
-const PAGE_URL = 'https://kitchen-mode.com';
+// Where the page and the code live: the loader bookmark, the counts and the link preview use this. Link previews on X
+// need the full address of og.png. kitchen-mode.vercel.app serves the same deployment, so bookmarks set up before
+// 1 Oct 2026 keep working; never take that domain off the Vercel project.
+const SITE_URL = 'https://kitchen-mode.com';
 const REPO_URL = 'https://github.com/richy-builds/kitchen-mode';
 // PostHog project (EU) for the anonymous usage counts. The key is public by design: it can send events, not read them.
 const POSTHOG_KEY = 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0';
@@ -190,9 +189,9 @@ const page = `<!doctype html>
 <meta property="og:type" content="website">
 <meta property="og:title" content="Kitchen Mode: any recipe page, one big step at a time">
 <meta property="og:description" content="${description}">
-<link rel="canonical" href="${PAGE_URL}/">
-${PAGE_URL ? `<meta property="og:url" content="${PAGE_URL}/">
-<meta property="og:image" content="${PAGE_URL}/og.png">
+${SITE_URL ? `<link rel="canonical" href="${SITE_URL}/">
+<meta property="og:url" content="${SITE_URL}/">
+<meta property="og:image" content="${SITE_URL}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Kitchen Mode: a recipe step on an order ticket, clipped to a steel rail, with the ingredients that step needs.">

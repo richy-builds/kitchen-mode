@@ -12,7 +12,7 @@ test.describe('the loader bookmark', () => {
     expect(LOADER.length).toBeLessThan(300);
     expect(LOADER).not.toMatch(/[%#]/);
     expect(LOADER).not.toMatch(/=>|`|\b(?:let|const|class)\b/);
-    expect(LOADER).toContain("'https://kitchen-mode.vercel.app/km.js'");
+    expect(LOADER).toContain("'https://kitchen-mode.com/km.js'");
   });
 
   test('opens Kitchen Mode on a recipe page and closes it when clicked again', async ({ page, pages }) => {

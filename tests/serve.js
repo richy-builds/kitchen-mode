@@ -1,9 +1,9 @@
-// Answers a browser context's requests for kitchen-mode.vercel.app from this checkout: the built km.js and
+// Answers a browser context's requests for kitchen-mode.com from this checkout: the built km.js and
 // index.html, the images, and the count relay, which records counts instead of sending them to PostHog.
 // Shared by the tests and the scripts, so they all run what's about to ship rather than what's live.
 import { readFileSync } from 'node:fs';
 
-export const SITE = 'https://kitchen-mode.vercel.app';
+export const SITE = 'https://kitchen-mode.com';
 const file = name => readFileSync(new URL(`../${name}`, import.meta.url));
 export const INDEX = file('index.html').toString();
 export const KM = file('km.js');

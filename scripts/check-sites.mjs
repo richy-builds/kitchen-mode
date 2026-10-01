@@ -16,7 +16,7 @@ const targets = urls.length ? urls.map(url => [new URL(url).hostname.replace(/^w
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ ...devices['Desktop Chrome'] });
-await context.route('https://kitchen-mode.vercel.app/**', route => serveSite(route));
+await context.route('https://kitchen-mode.com/**', route => serveSite(route));
 
 const check = async ([name, url]) => {
   const page = await context.newPage();

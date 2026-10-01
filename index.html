@@ -378,7 +378,7 @@
     <p class="lede for-mouse">One click on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
     <p class="lede for-touch">One tap on a recipe page hides the ads, pop-ups and life story, and shows each step a sentence at a time, big enough to read from across the kitchen.</p>
     <div class="actions">
-      <a class="bookmarklet for-mouse" href="javascript:(function(){var s=document.createElement('script');s.src='https://kitchen-mode.vercel.app/km.js';s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()" data-tip="hint">Kitchen Mode</a>
+      <a class="bookmarklet for-mouse" href="javascript:(function(){var s=document.createElement('script');s.src='https://kitchen-mode.com/km.js';s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()" data-tip="hint">Kitchen Mode</a>
       <button class="button try" type="button" data-try>Try it on a sample recipe</button>
       <a class="button for-touch" href="#phone">Set it up on your phone</a>
     </div>
@@ -443,14 +443,14 @@
       <p class="section-lede for-touch">Phones and tablets have no bookmarks bar to drag it to, so it goes in your bookmarks instead. It takes a couple of minutes, once.</p>
       <ol class="steps for-mouse">
         <li><div><strong>Show your bookmarks bar.</strong> Press <span class="combo"><kbd>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span> on a Mac, or <span class="combo"><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd></span> on Windows. Chrome, Edge, Brave, Safari and Firefox all have one.</div></li>
-        <li><div><strong>Drag this ticket up onto the bar.</strong><br><a class="bookmarklet compact" href="javascript:(function(){var s=document.createElement('script');s.src='https://kitchen-mode.vercel.app/km.js';s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()" data-tip="tip">Kitchen Mode</a><p class="tip" id="tip" aria-live="polite"></p></div></li>
+        <li><div><strong>Drag this ticket up onto the bar.</strong><br><a class="bookmarklet compact" href="javascript:(function(){var s=document.createElement('script');s.src='https://kitchen-mode.com/km.js';s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()" data-tip="tip">Kitchen Mode</a><p class="tip" id="tip" aria-live="polite"></p></div></li>
         <li><div><strong>Test it.</strong> <a href="#test">Open the test recipe</a> and click Kitchen Mode on the bar. After that, use it the same way on any recipe. Click it again, or press <kbd>Esc</kbd>, to close it.</div></li>
       </ol>
       <details id="phone">
         <summary>Setting it up on a phone or tablet</summary>
         <div class="phone">
           <p>You save Kitchen Mode as a bookmark whose address is this short piece of code:</p>
-          <pre id="code">javascript:(function(){var s=document.createElement('script');s.src='https://kitchen-mode.vercel.app/km.js';s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()</pre>
+          <pre id="code">javascript:(function(){var s=document.createElement('script');s.src='https://kitchen-mode.com/km.js';s.onerror=function(){alert('Kitchen Mode could not load on this page.')};document.documentElement.appendChild(s)})()</pre>
           <p><button class="button small" type="button" id="copy">Copy the code</button></p>
           <h3>Android (Chrome)</h3>
           <ol>
@@ -684,7 +684,7 @@ function count(event, props) {
   if (!location.hostname) return;
   props = props || {};
   props.$process_person_profile = false;
-  fetch('https://kitchen-mode.vercel.app/relay/i/v0/e/', {
+  fetch('https://kitchen-mode.com/relay/i/v0/e/', {
     method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true,
     body: JSON.stringify({ api_key: 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0', event: 'kitchen_mode_' + event, distinct_id: visit, properties: props })
   }).catch(function () {});
@@ -794,7 +794,7 @@ return [hrs && `${hrs} hr`, mins % 60 && `${mins % 60} min`].filter(Boolean).joi
 const recipe = findRecipe();
 const steps = recipe ? getSteps(recipe.recipeInstructions).map(s => ({ ...s, sentences: splitSentences(s.text) })) : [];
 try {
-if (location.hostname) fetch('https://kitchen-mode.vercel.app/relay/i/v0/e/', {
+if (location.hostname) fetch('https://kitchen-mode.com/relay/i/v0/e/', {
 method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
 body: JSON.stringify({
 api_key: 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
