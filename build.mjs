@@ -11,8 +11,11 @@ const BUILD = check ? read('./km.js').match(/build: '([\d-]+)'/)?.[1] ?? '' : ne
 
 // Your X handle without the @. Leave empty to keep the credit off the page.
 const HANDLE = 'richyjudge';
-// Where the page is deployed. Link previews on X need the full address of og.png.
+// Where the code lives: the loader bookmark and the counts use this. It stays on vercel.app on purpose, so no installed
+// bookmark depends on a domain renewal. Never point it at PAGE_URL.
 const SITE_URL = 'https://kitchen-mode.vercel.app';
+// The page's public address, for link previews and anything that tells people where it lives. Link previews on X need the full address of og.png.
+const PAGE_URL = 'https://kitchen-mode.com';
 const REPO_URL = 'https://github.com/richy-builds/kitchen-mode';
 // PostHog project (EU) for the anonymous usage counts. The key is public by design: it can send events, not read them.
 const POSTHOG_KEY = 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0';
@@ -139,7 +142,7 @@ const drawing = `<svg viewBox="0 0 760 560" aria-hidden="true">
   <rect width="760" height="46" class="d-chrome"/>
   <circle cx="21" cy="23" r="5" class="d-dot"/><circle cx="39" cy="23" r="5" class="d-dot"/><circle cx="57" cy="23" r="5" class="d-dot"/>
   <rect x="76" y="11" width="668" height="24" rx="12" class="d-field"/>
-  <text x="90" y="27.5" class="d-url">kitchen-mode.vercel.app</text>
+  <text x="90" y="27.5" class="d-url">kitchen-mode.com</text>
   <rect y="46" width="760" height="44" fill="url(#km-bar)"/>
   <path d="M0 46.5H760" class="d-line-top"/><path d="M0 89.5H760" class="d-line"/>
   <g class="d-items">
@@ -187,8 +190,9 @@ const page = `<!doctype html>
 <meta property="og:type" content="website">
 <meta property="og:title" content="Kitchen Mode: any recipe page, one big step at a time">
 <meta property="og:description" content="${description}">
-${SITE_URL ? `<meta property="og:url" content="${SITE_URL}/">
-<meta property="og:image" content="${SITE_URL}/og.png">
+<link rel="canonical" href="${PAGE_URL}/">
+${PAGE_URL ? `<meta property="og:url" content="${PAGE_URL}/">
+<meta property="og:image" content="${PAGE_URL}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Kitchen Mode: a recipe step on an order ticket, clipped to a steel rail, with the ingredients that step needs.">

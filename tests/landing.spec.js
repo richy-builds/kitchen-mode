@@ -15,6 +15,15 @@ test.describe('on a computer', () => {
     expect(counts[2].properties).toMatchObject({ site: 'kitchen-mode.vercel.app', loader: false });
   });
 
+  test('the page names kitchen-mode.com as its address, while the bookmark loads code from vercel.app', async ({ page }) => {
+    await page.goto(SITE);
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://kitchen-mode.com/');
+    await expect(page.locator('meta[property="og:url"]')).toHaveAttribute('content', 'https://kitchen-mode.com/');
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', 'https://kitchen-mode.com/og.png');
+    await expect(page.locator('.d-url').first()).toHaveText('kitchen-mode.com');
+    expect(LOADER).toContain('https://kitchen-mode.vercel.app/km.js');
+  });
+
   test('#try opens the sample straight away', async ({ page }) => {
     await page.goto(`${SITE}/#try`);
     await expect(page.locator('kitchen-mode h1')).toHaveText('Smoky tomato & butter bean stew');
