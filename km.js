@@ -103,8 +103,8 @@ try {
 if (location.hostname) fetch('https://kitchen-mode.com/relay/i/v0/e/', {
 method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
 body: JSON.stringify({
-api_key: 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
-properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-10-01', loader,
+api_key: 'phc_uF8Cd9E2zcnwqyMChuGw4fkYP7X366FWh2LGLTuARbpB', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
+properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-10-02', loader,
 touch, $process_person_profile: false },
 }),
 }).catch(() => {});

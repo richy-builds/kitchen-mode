@@ -17,7 +17,7 @@ const HANDLE = 'richyjudge';
 const SITE_URL = 'https://kitchen-mode.com';
 const REPO_URL = 'https://github.com/richy-builds/kitchen-mode';
 // PostHog project (EU) for the anonymous usage counts. The key is public by design: it can send events, not read them.
-const POSTHOG_KEY = 'phc_lEkG3kWAIlChPY70oaG1aeEIi3ucUwYV42Cpvficcl0';
+const POSTHOG_KEY = 'phc_uF8Cd9E2zcnwqyMChuGw4fkYP7X366FWh2LGLTuARbpB';
 // Counts go through this site (see vercel.json), so ad blockers that block posthog.com let them through.
 const COUNT_URL = SITE_URL + '/relay/i/v0/e/';
 
