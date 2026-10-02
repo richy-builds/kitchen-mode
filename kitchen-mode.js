@@ -261,6 +261,41 @@
     voiceReady = true;
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {}
   };
+  const speechOf = (verb, n) => `${verb ? `${verb}, step` : 'Step'} ${n}. Time's up.`;
+  // Alice (Kokoro-82M, Apache 2.0) recorded every piece of that line once: each verb, "Step 1" to "Step 30" and
+  // "Time's up". build.mjs puts the recording (voice/alice.mp3, from scripts/voice.mjs) in this file, so speaking
+  // makes no request, and her pieces are booked on the audio clock like the beeps, so a background tab can't delay them.
+  // Anything she didn't record, or a browser that can't decode it, gets the browser's voice as before.
+  const VOICE = '%VOICE%';
+  let alice;
+  const loadAlice = () => alice ||= new Promise((ok, no) => {
+    if (!VOICE?.mp3) return no();
+    const bytes = Uint8Array.from(atob(VOICE.mp3), c => c.charCodeAt(0));
+    audio.decodeAudioData(bytes.buffer, ok, no)?.catch?.(() => {});
+  }).then(buf => {
+    // Decoders keep different amounts of the MP3's start padding, so find where her first piece really starts.
+    const data = buf.getChannelData(0);
+    let i = 0;
+    while (i < data.length && Math.abs(data[i]) < VOICE.thr) i++;
+    return { buf, shift: i / buf.sampleRate - VOICE.first };
+  });
+  // The pieces go into the timer's own output, so cancelling it silences them, with the film's gaps between them.
+  const bookVoice = t => {
+    const [verb, n] = t.voice;
+    const pieces = [verb.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('caramelize', 'caramelise'), String(n), 'up'].filter(Boolean);
+    loadAlice().then(({ buf, shift }) => {
+      let when = t.at + 0.9;
+      if (!timers.includes(t) || when < audio.currentTime || !pieces.every(p => VOICE.clips[p])) return;
+      pieces.forEach((p, i) => {
+        const [start, dur] = VOICE.clips[p], src = audio.createBufferSource();
+        src.buffer = buf;
+        src.connect(t.out);
+        src.start(when, start + shift, dur);
+        when += dur + (pieces[i + 1] === 'up' ? 0.18 : 0.05);
+      });
+      t.voiced = true;
+    }).catch(() => {});
+  };
   // A timer is named after the cooking verb nearest before its time ("Leave to rest for 10 mins" -> Rest).
   const VERB_RE = /\b(bake|roast|boil|simmer|cook|fry|grill|griddle|broil|rest|chill|marinate|soak|steam|poach|blanch|toast|brown|sear|braise|reduce|stir|whisk|knead|prove|proof|rise|cool|stand|microwave|saut[eé]|caramelise|caramelize|soften|melt|bubble|char|freeze|steep|infuse|blitz|blend|mix|beat)(?:s|ing)?\b/gi;
   const verbBefore = text => {
@@ -281,7 +316,7 @@
         t.ringing = true;
         t.el.classList.add('ringing');
         // After the first three beeps.
-        setTimeout(() => { if (timers.includes(t)) say(t.speech); }, 900);
+        setTimeout(() => { if (timers.includes(t) && !t.voiced) say(speechOf(...t.voice)); }, 900);
       }
       t.time.textContent = t.ringing ? "Time's up!" : clock(left);
       if (t.ringing && now - t.lastBeep > 2500) { t.lastBeep = now; beep(t.out); }
@@ -363,18 +398,20 @@
     if (minimised && !timers.length) close();
   };
   const RINGS_BOOKED = 36;
-  const startTimer = (secs, label, key, speech) => {
+  const startTimer = (secs, label, key, voice) => {
     if (timers.some(t => t.key === key)) return;
     unlockAudio();
     unlockVoice();
-    const t = { key, label, speech, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
+    const t = { key, label, voice, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
     if (audio) {
       // Book the first 90 seconds of rings on the audio clock as well: browsers slow down timers in background tabs,
       // Chrome to once a minute, but not audio. Once the page is making sound its timers speed up again and take over.
+      t.at = audio.currentTime + secs;
       t.out = audio.createGain();
       t.out.connect(audio.destination);
-      for (let i = 0; i < RINGS_BOOKED; i++) beep(t.out, audio.currentTime + secs + i * 2.5);
+      for (let i = 0; i < RINGS_BOOKED; i++) beep(t.out, t.at + i * 2.5);
       t.lastBeep = t.end + (RINGS_BOOKED - 1) * 2500;
+      bookVoice(t);
     }
     t.time = h('span', { class: 'time' }, clock(secs));
     t.el = h('div', {
@@ -400,11 +437,10 @@
       const key = `${si}.${bi}.${m.index}`;
       const verb = verbBefore(text.slice(0, m.index));
       const label = verb ? `Step ${si + 1} · ${verb}` : `Step ${si + 1}`;
-      const speech = `${verb ? `${verb}, step` : 'Step'} ${si + 1}. Time's up.`;
       out.push(text.slice(last, m.index), h('button', {
         class: timers.some(t => t.key === key) ? 'chip started' : 'chip',
         'data-key': key,
-        onclick: e => { e.stopPropagation(); startTimer(secs, label, key, speech); },
+        onclick: e => { e.stopPropagation(); startTimer(secs, label, key, [verb, si + 1]); },
       }, '⏱︎ ', m[0]));
       last = m.index + m[0].length;
     }

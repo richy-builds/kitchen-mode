@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test as base, expect, recipe, openRecipe, clickBookmark, km, PHONE } from './helpers.js';
 
 // Timers run on a paused fake clock, moved on with clock.runFor. Speech and the audio clock are recorded, not played.
@@ -6,12 +7,19 @@ const test = base.extend({
     await page.addInitScript(() => {
       window.__spoken = [];
       window.__beeps = [];
+      window.__voice = [];
       speechSynthesis.speak = u => { window.__spoken.push(u.text); };
       const create = AudioContext.prototype.createOscillator;
       AudioContext.prototype.createOscillator = function () {
         const osc = create.call(this), start = osc.start;
         osc.start = at => { window.__beeps.push(at); start.call(osc, at); };
         return osc;
+      };
+      const createSource = AudioContext.prototype.createBufferSource;
+      AudioContext.prototype.createBufferSource = function () {
+        const src = createSource.call(this), start = src.start;
+        src.start = (when, offset, dur) => { window.__voice.push({ when, offset, dur }); start.call(src, when, offset, dur); };
+        return src;
       };
     });
     await page.clock.install();
@@ -92,6 +100,43 @@ test('the alarm is booked on the audio clock for its first 90 seconds, and cance
   await expect(km(page).chip('1 min')).toHaveClass('chip');
 });
 
+test("Alice says which timer it was, booked on the audio clock after the first beeps", async ({ page, pages }) => {
+  await openRecipe(page, pages, garlic);
+  await pause(page);
+  await page.keyboard.press('Space');
+  await km(page).chip('1 min').click();
+  // Her recording is decoded on the first tap, so the pieces are booked a moment after it.
+  await expect.poll(() => page.evaluate(() => window.__voice.length)).toBe(3);
+  const [voice, beeps] = await page.evaluate(() => [window.__voice, window.__beeps]);
+  const { clips } = JSON.parse(readFileSync(new URL('../voice/alice.json', import.meta.url), 'utf8'));
+  // "Fry", "Step 1", "Time's up": each piece whole, all shifted alike to where the decoder put the recording.
+  const shift = voice[0].offset - clips.fry[0];
+  expect(Math.abs(shift)).toBeLessThan(0.06);
+  [clips.fry, clips[1], clips.up].forEach(([start, dur], i) => {
+    expect(voice[i].offset).toBeCloseTo(start + shift, 4);
+    expect(voice[i].dur).toBeCloseTo(dur, 4);
+  });
+  // 0.9 s after the first beep, then the gaps the film uses: 50 ms before the step, 180 ms before "Time's up".
+  expect(voice[0].when - Math.min(...beeps)).toBeCloseTo(0.9, 4);
+  expect(voice[1].when - voice[0].when).toBeCloseTo(clips.fry[1] + 0.05, 4);
+  expect(voice[2].when - voice[1].when).toBeCloseTo(clips[1][1] + 0.18, 4);
+  await page.clock.runFor(62_000);
+  expect(await page.evaluate(() => window.__spoken)).not.toContain("Fry, step 1. Time's up.");
+});
+
+test("the browser's own voice says it when Alice's recording can't play", async ({ page, pages }) => {
+  await page.addInitScript(() => {
+    AudioContext.prototype.decodeAudioData = function (data, ok, no) { queueMicrotask(() => no?.(new Error('no decoder'))); };
+  });
+  await openRecipe(page, pages, garlic);
+  await pause(page);
+  await page.keyboard.press('Space');
+  await km(page).chip('1 min').click();
+  await page.clock.runFor(62_000);
+  expect(await page.evaluate(() => window.__spoken)).toContain("Fry, step 1. Time's up.");
+  expect(await page.evaluate(() => window.__voice)).toHaveLength(0);
+});
+
 test('glance mode: left alone with a timer running, the countdown fills the screen with the sentence and the next one', async ({ page, pages }) => {
   await openRecipe(page, pages, garlic);
   await pause(page);
@@ -127,7 +172,7 @@ test('a ringing timer takes over the screen in red, says which it was, and a tap
   await expect(glance.locator('.g-next')).toHaveText('Next · Step 2Add the tomatoes and bring to the boil.');
   await expect(page).toHaveTitle("⏰ Time's up! Garlic toast");
   await page.clock.runFor(1000);
-  expect(await page.evaluate(() => window.__spoken)).toContain("Fry, step 1. Time's up.");
+  expect(await page.evaluate(() => window.__voice)).toHaveLength(3);
 
   await glance.click();
   await expect(glance).not.toBeVisible();

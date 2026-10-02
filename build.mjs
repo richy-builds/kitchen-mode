@@ -39,6 +39,11 @@ try { new Function(source); } catch (e) {
   console.error(`km.js would not parse after stripping comments: ${e.message}`);
   process.exit(1);
 }
+// Alice's voice (voice/, from scripts/voice.mjs) goes into km.js only, after the comment stripping, which base64 could
+// trip. The landing page's own copy, for "Try it", keeps the browser's voice, so the page stays light.
+const voice = JSON.stringify({ mp3: readFileSync(new URL('./voice/alice.mp3', import.meta.url)).toString('base64'), ...JSON.parse(read('./voice/alice.json')) });
+const km = source.replace("'%VOICE%'", () => voice);
+const pageSource = source.replace("'%VOICE%'", 'null');
 
 // The bookmark, on computers and phones alike, is a short loader for km.js (the same code) from this site, so
 // everyone runs the current build. Pasting 34 KB of code into a phone bookmark didn't survive, and a short one can be
@@ -758,7 +763,7 @@ function count(event, props) {
 count('page_viewed', { from: document.referrer ? new URL(document.referrer).hostname : '' });
 
 function runKitchenMode() {
-${source.replace(/<\/script/gi, '<\\/script')}
+${pageSource.replace(/<\/script/gi, '<\\/script')}
 }
 
 function addSample() {
@@ -904,7 +909,7 @@ document.getElementById('copy').addEventListener('click', function () {
 </html>
 `;
 
-const out = { 'index.html': page, 'km.js': source + '\n' };
+const out = { 'index.html': page, 'km.js': km + '\n' };
 if (check) {
   // Vercel serves the committed files as they are, so a source change pushed without rebuilding never ships.
   const stale = Object.keys(out).filter(file => read(`./${file}`) !== out[file]);
@@ -916,5 +921,5 @@ if (check) {
 } else {
   for (const [file, text] of Object.entries(out)) writeFileSync(new URL(`./${file}`, import.meta.url), text);
   console.log(`index.html written (page ${(page.length / 1024).toFixed(1)} KB)`);
-  console.log(`km.js written (${(source.length / 1024).toFixed(1)} KB, loaded by the ${loader.length}-character bookmark)`);
+  console.log(`km.js written (${(km.length / 1024).toFixed(1)} KB, loaded by the ${loader.length}-character bookmark)`);
 }
