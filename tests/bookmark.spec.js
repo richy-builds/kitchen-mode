@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, LOADER, RECIPES, recipe, recipePage, clickBookmark, openRecipe, km } from './helpers.js';
 
 const stew = recipe({
@@ -5,6 +6,14 @@ const stew = recipe({
   ingredients: ['1 onion', '400g tin chopped tomatoes'],
   steps: ['Fry the onion until soft and golden.', 'Add the tomatoes and simmer until thick.'],
 });
+
+// Counts the km.js script tags that run from now on. A script's load event fires once it has run, and a capturing
+// listener on the document sees it even though it doesn't bubble.
+const countRuns = page => page.evaluate(() => {
+  window.__runs = 0;
+  document.addEventListener('load', e => { if (e.target.src?.includes('/km.js')) window.__runs++; }, true);
+});
+const ran = (page, n) => expect.poll(() => page.evaluate(() => window.__runs)).toBe(n);
 
 test.describe('the loader bookmark', () => {
   test('is short, ES5 and has no % or #, so it pastes into a phone bookmark and runs as written', () => {
@@ -15,12 +24,64 @@ test.describe('the loader bookmark', () => {
     expect(LOADER).toContain("'https://kitchen-mode.com/km.js'");
   });
 
-  test('opens Kitchen Mode on a recipe page and closes it when clicked again', async ({ page, pages }) => {
+  // Every click adds a script tag that loads km.js, and a run while the view is open closes it. So a double-click
+  // on the bookmark used to open Kitchen Mode and close it again at once, as if nothing had happened.
+  test('opens Kitchen Mode on a recipe page, once for a double-click, and closes it when clicked again later', async ({ page, pages }) => {
+    await page.clock.install();
     await openRecipe(page, pages, stew);
     await expect(page.locator('kitchen-mode h1')).toHaveText('Bean stew');
+    await countRuns(page);
+    await clickBookmark(page);
+    await ran(page, 1);
+    await expect(page.locator('kitchen-mode h1')).toHaveText('Bean stew');
+    expect(await page.evaluate(() => !!window.__kitchenMode)).toBe(true);
+
+    await page.clock.runFor(1500);
     await clickBookmark(page);
     await expect(page.locator('kitchen-mode')).toHaveCount(0);
     expect(await page.evaluate(() => window.__kitchenMode)).toBeUndefined();
+  });
+
+  test('a second click while km.js is still downloading is the same click', async ({ page, pages, kmHold }) => {
+    pages.set('/recipe', recipePage(stew));
+    await page.goto(`${RECIPES}/recipe`);
+    await countRuns(page);
+    kmHold.on = true;
+    await clickBookmark(page);
+    await clickBookmark(page);
+    // Chrome shares the one download between both tags, so there's one request to let through.
+    await expect.poll(() => kmHold.waiting.length).toBe(1);
+    kmHold.waiting.shift()();
+    await ran(page, 2);
+    await expect(page.locator('kitchen-mode h1')).toHaveText('Bean stew');
+    expect(await page.evaluate(() => !!window.__kitchenMode)).toBe(true);
+  });
+
+  test('a tag already waiting when the view opened never closes it, however late its copy arrives', async ({ page, pages, kmHold }) => {
+    await page.clock.install();
+    pages.set('/recipe', recipePage(stew));
+    await page.goto(`${RECIPES}/recipe`);
+    await countRuns(page);
+    kmHold.on = true;
+    await clickBookmark(page);
+    // Stands in for a browser that fetches each tag on its own: the same file at an address Chrome won't share.
+    await page.evaluate(() => {
+      const s = document.createElement('script');
+      s.src = 'https://kitchen-mode.com/km.js?again';
+      document.documentElement.appendChild(s);
+    });
+    await expect.poll(() => kmHold.waiting.length).toBe(2);
+    kmHold.waiting.shift()();
+    await expect(page.locator('kitchen-mode h1')).toHaveText('Bean stew');
+    await page.clock.runFor(5000);
+    kmHold.waiting.shift()();
+    await ran(page, 2);
+    await expect(page.locator('kitchen-mode h1')).toHaveText('Bean stew');
+    expect(await page.evaluate(() => !!window.__kitchenMode)).toBe(true);
+    // A fresh click still closes it.
+    kmHold.on = false;
+    await clickBookmark(page);
+    await expect(page.locator('kitchen-mode')).toHaveCount(0);
   });
 
   test('says so when the site blocks the script', async ({ page, pages, pageHeaders }) => {
@@ -37,7 +98,6 @@ test.describe('the loader bookmark', () => {
   // A script served without a charset is decoded in the page's encoding. On a Windows-1252 page, a "½" in km.js
   // turned into two junk characters, one regex stopped parsing and the click did nothing at all.
   test('km.js is plain ASCII, so it runs on pages that aren’t UTF-8', async ({ page, pages }) => {
-    const { readFileSync } = await import('node:fs');
     expect(readFileSync(new URL('../km.js', import.meta.url), 'latin1')).toMatch(/^[\x00-\x7f]*$/);
     await openRecipe(page, pages, recipePage(stew).replace('<meta charset="utf-8">', '<meta charset="windows-1252">'));
     await expect(page.locator('kitchen-mode h1')).toHaveText('Bean stew');

@@ -3,9 +3,16 @@
  * Readable source of the bookmarklet. Run `node build.mjs` to rebuild index.html.
  */
 (() => {
+  // Each tap of the bookmark adds a script tag that loads this file, so two quick taps leave two waiting. A tag that
+  // was already waiting when another ran is part of the same tap, not a tap to close, so it does nothing.
+  const tag = document.currentScript;
+  if (tag?.hasAttribute('data-km-handled')) return;
+  for (const s of document.scripts) {
+    if (s !== tag && /\/km\.js(?:[?#]|$)/.test(s.src)) s.setAttribute('data-km-handled', '');
+  }
   if (window.__kitchenMode) { window.__kitchenMode.close(); return; }
   // Only set while km.js runs as a script file, which only the bookmark does ("Try it" runs the code inline).
-  const loader = !!document.currentScript?.src;
+  const loader = !!tag?.src;
   // Phones and tablets, as the landing page tells them apart. Counted with each open, and picks the key hints.
   const touch = matchMedia('(pointer: coarse)').matches;
 
@@ -711,9 +718,10 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
   document.documentElement.append(host);
 
   const prevOverflow = document.documentElement.style.overflow;
-  let watcher = null, minimised = false;
+  let watcher = null, minimised = false, openedAt = 0;
   const open = () => {
     minimised = false;
+    openedAt = Date.now();
     root.classList.remove('mini');
     place('inset:0');
     document.documentElement.style.overflow = 'hidden';
@@ -751,6 +759,7 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
   document.addEventListener('visibilitychange', onVisible);
   getLock();
   open();
-  // Running the bookmark again closes Kitchen Mode, or brings it back if only its timers are showing.
-  window.__kitchenMode = { close: () => (minimised ? open() : close()) };
+  // Running the bookmark again closes Kitchen Mode, or brings it back if only its timers are showing. A run within
+  // a moment of opening is the same tap again (a double-click, say), since nobody closes it that soon on purpose.
+  window.__kitchenMode = { close: () => { if (minimised) open(); else if (Date.now() - openedAt >= 1500) close(); } };
 })();

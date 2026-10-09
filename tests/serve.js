@@ -10,16 +10,18 @@ export const KM = file('km.js');
 // The bookmark people install: the href of the ticket on the landing page.
 export const LOADER = INDEX.match(/class="bookmarklet[^"]*" href="(javascript:[^"]+)"/)[1];
 
-// Returns true if it answered the request.
-export const serveSite = async (route, counts = []) => {
+// Returns true if it answered the request. `hold`, if given, is awaited before km.js is sent, as a slow connection would.
+export const serveSite = async (route, counts = [], hold) => {
   const req = route.request();
   const url = new URL(req.url());
   if (url.origin !== SITE) return false;
   if (url.pathname.startsWith('/relay/')) {
     counts.push({ ...JSON.parse(req.postData()), headers: await req.allHeaders() });
     await route.fulfill({ status: 200, body: '1' });
-  } else if (url.pathname === '/km.js') await route.fulfill({ body: KM, contentType: 'text/javascript' });
-  else if (url.pathname === '/' || url.pathname === '/index.html') await route.fulfill({ body: INDEX, contentType: 'text/html' });
+  } else if (url.pathname === '/km.js') {
+    if (hold) await hold();
+    await route.fulfill({ body: KM, contentType: 'text/javascript' });
+  } else if (url.pathname === '/' || url.pathname === '/index.html') await route.fulfill({ body: INDEX, contentType: 'text/html' });
   else if (url.pathname === '/_vercel/insights/script.js') await route.fulfill({ body: '', contentType: 'text/javascript' });
   else if (url.pathname.endsWith('.png')) await route.fulfill({ body: file(url.pathname.slice(1)), contentType: 'image/png' });
   else await route.fulfill({ status: 404, body: '' });

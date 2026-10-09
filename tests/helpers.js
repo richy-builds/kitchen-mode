@@ -31,11 +31,14 @@ export const test = base.extend({
   pages: async ({}, use) => { await use(new Map()); },
   // Response headers for recipe pages, e.g. a Content-Security-Policy.
   pageHeaders: async ({}, use) => { await use({}); },
-  context: async ({ context, counts, pages, pageHeaders }, use) => {
+  // While `on`, km.js is held back like a slow download: each waiting request puts its release in `waiting`.
+  kmHold: async ({}, use) => { await use({ on: false, waiting: [] }); },
+  context: async ({ context, counts, pages, pageHeaders, kmHold }, use) => {
+    const hold = () => (kmHold.on ? new Promise(release => kmHold.waiting.push(release)) : undefined);
     await context.route('**/*', async route => {
       const url = new URL(route.request().url());
       if (url.protocol === 'data:' || url.protocol === 'file:') return route.continue();
-      if (await serveSite(route, counts)) return;
+      if (await serveSite(route, counts, hold)) return;
       if (url.origin === RECIPES && pages.has(url.pathname)) {
         return route.fulfill({ body: pages.get(url.pathname), contentType: 'text/html', headers: pageHeaders });
       }

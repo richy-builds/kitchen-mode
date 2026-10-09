@@ -29,11 +29,15 @@ test('an open sends one count, with nothing but the site, what it found and the 
 });
 
 test('each open gets a new random ID, so counts can’t be joined up into a person', async ({ page, pages, counts }) => {
+  await page.clock.install();
   pages.set('/recipe', recipePage(stew));
   await page.goto(`${RECIPES}/recipe`);
   await clickBookmark(page);
   await expect(page.locator('kitchen-mode .km')).toBeVisible();
+  // Closed and opened again, in their own time: two quick clicks count as one (see bookmark.spec.js).
+  await page.clock.runFor(1500);
   await clickBookmark(page);
+  await expect(page.locator('kitchen-mode')).toHaveCount(0);
   await clickBookmark(page);
   await expect.poll(() => counts.length).toBe(2);
   expect(counts[0].distinct_id).not.toBe(counts[1].distinct_id);

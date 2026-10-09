@@ -1,6 +1,11 @@
 (() => {
+const tag = document.currentScript;
+if (tag?.hasAttribute('data-km-handled')) return;
+for (const s of document.scripts) {
+if (s !== tag && /\/km\.js(?:[?#]|$)/.test(s.src)) s.setAttribute('data-km-handled', '');
+}
 if (window.__kitchenMode) { window.__kitchenMode.close(); return; }
-const loader = !!document.currentScript?.src;
+const loader = !!tag?.src;
 const touch = matchMedia('(pointer: coarse)').matches;
 const h = (tag, props = {}, ...kids) => {
 const el = document.createElement(tag);
@@ -104,7 +109,7 @@ if (location.hostname) fetch('https://kitchen-mode.com/relay/i/v0/e/', {
 method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
 body: JSON.stringify({
 api_key: 'phc_uF8Cd9E2zcnwqyMChuGw4fkYP7X366FWh2LGLTuARbpB', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
-properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-10-02', loader,
+properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-10-09', loader,
 touch, $process_person_profile: false },
 }),
 }).catch(() => {});
@@ -621,9 +626,10 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 `), root);
 document.documentElement.append(host);
 const prevOverflow = document.documentElement.style.overflow;
-let watcher = null, minimised = false;
+let watcher = null, minimised = false, openedAt = 0;
 const open = () => {
 minimised = false;
+openedAt = Date.now();
 root.classList.remove('mini');
 place('inset:0');
 document.documentElement.style.overflow = 'hidden';
@@ -657,5 +663,5 @@ delete window.__kitchenMode;
 document.addEventListener('visibilitychange', onVisible);
 getLock();
 open();
-window.__kitchenMode = { close: () => (minimised ? open() : close()) };
+window.__kitchenMode = { close: () => { if (minimised) open(); else if (Date.now() - openedAt >= 1500) close(); } };
 })();
