@@ -408,6 +408,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 
   /* Shown on the test recipe (#test): what to do next, then that it worked */
   .test-cue { position: fixed; inset: 0 0 auto; z-index: 10; padding: 14px 16px; background: var(--espresso); color: var(--on-espresso); font: 700 18px/1.4 var(--body); text-align: center; box-shadow: 0 10px 30px -10px rgb(0 0 0 / .5); }
+  .in-app-warning { padding: 14px 16px; margin: 0 0 18px; background: var(--espresso); color: var(--on-espresso); font-weight: 700; border-radius: 8px; }
   .test-cue a { color: var(--amber); }
   .test-cue .done { color: var(--amber); }
 
@@ -550,6 +551,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
 </head>
 <body>
 <div class="test-cue" id="test-cue" role="status" hidden></div>
+<div class="test-cue" id="in-app-warning" role="alert" hidden>This setup needs Chrome itself. Open this page in Chrome first: tap ⋮, then <strong>Open in Chrome browser</strong>.</div>
 <div class="drop-cue" id="drop-cue" hidden>${icon(UP, 22, 2.8)} Drop it on your bookmarks bar, just above this page ${icon(UP, 22, 2.8)}</div>
 <header class="top wrap">
   <a class="brand" href="./">${pan(26)}Kitchen Mode</a>
@@ -639,11 +641,12 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
           <pre id="code">${loader.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>
           <p><button class="button small" type="button" id="copy">Copy the code</button></p>
           <h3>Android (Chrome)</h3>
+          <p class="in-app-warning for-touch">Open this page in Chrome first. Links from other apps can open in a small Chrome window whose address bar will not let you type. Tap ⋮, then <strong>Open in Chrome browser</strong>.</p>
           <ol>
             <li>Tap <strong>Copy the code</strong>.</li>
             <li>Tap ⋮, then the star, to bookmark this page. Then tap the message that pops up at the bottom (<strong>Bookmark saved</strong>, or <strong>Edit</strong>) before it goes. (Missed it? Tap ⋮, then Bookmarks, then Mobile bookmarks, then ⋮ next to Kitchen Mode, then Edit.)</li>
-            <li>Change the name to <code>kitchenmode</code>, as one word. In the URL box, press and hold until the whole address is highlighted (tap <strong>Select all</strong> if it isn’t), then tap <strong>Paste</strong>. The URL should now start with <code>javascript:</code>. Go back to this page, and it saves.</li>
-            <li><a href="#test">Open the test recipe</a>, tap the address bar and type <code>kitchenmode:</code> with a colon at the end, then tap the suggestion with the star. The colon stops Chrome filling the list with searches, which push the star down behind the keyboard. Always open it this way: tapping it in your bookmarks list does nothing, since Chrome on Android only runs it from the address bar.
+            <li>Change the name to <code>kitchenmode</code>, as one word. Check the name reads <code>kitchenmode</code> with no space. In the URL box, press and hold until the whole address is highlighted (tap <strong>Select all</strong> if it isn’t), then tap <strong>Paste</strong>. The URL should now start with <code>javascript:</code>. Go back to this page, and it saves.</li>
+            <li><a href="#test">Open the test recipe</a>, tap the address bar and type <code>kitchenmode:</code> with a colon at the end, then tap the suggestion with the star. If no star appears, the bookmark name is wrong: go back and edit it. The colon stops Chrome filling the list with searches, which push the star down behind the keyboard. Always open it this way: tapping it in your bookmarks list does nothing, since Chrome on Android only runs it from the address bar.
               <figure class="shot">
                 <picture>
                   <source srcset="android-address-bar-dark.png" media="(prefers-color-scheme: dark)">
@@ -653,7 +656,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
               </figure>
             </li>
           </ol>
-          <p>These steps are for Chrome. If you normally use Samsung Internet or another browser, open this page in Chrome to set it up. Pages opened from another app, like Gmail, show an ✕ at the top left, and their address bar won’t let you type: tap ⋮, then <strong>Open in Chrome browser</strong>, first. That goes for recipes too.</p>
+          <p>These steps are for Chrome. If you normally use Samsung Internet or another browser, open this page in Chrome to set it up. That goes for recipes too.</p>
           <h3>iPhone and iPad (Safari)</h3>
           <ol>
             <li>Tap <strong>Copy the code</strong>.</li>
@@ -786,6 +789,8 @@ if (location.hash === '#try') tryIt();
 
 // The test recipe (#test): the sample recipe is on the page, so the bookmark someone just made opens it, and the
 // banner says it worked. Like #try, Google never sees it, since it only reads the page without the #.
+var inAppWarning = document.getElementById('in-app-warning');
+if (navigator.userAgent.toLowerCase().indexOf('; wv)') > -1) inAppWarning.hidden = false;
 var testCue = document.getElementById('test-cue'), testing = false;
 function startTest() {
   if (testing || location.hash !== '#test') return;

@@ -88,6 +88,22 @@ test.describe('on a phone', () => {
     await expect.poll(() => counts.find(c => c.event === 'kitchen_mode_test_passed')?.properties?.touch).toBe(true);
   });
 
+  test('Android setup explains Chrome, the bookmark name and a missing star', async ({ page }) => {
+    await page.goto(SITE);
+    const steps = page.locator('#phone .phone h3').filter({ hasText: 'Android (Chrome)' }).locator('xpath=following-sibling::ol[1]');
+    await expect(steps.locator('xpath=preceding-sibling::p[1]')).toContainText('Open this page in Chrome first');
+    await expect(steps.locator('li').nth(2)).toContainText('Check the name reads kitchenmode with no space');
+    await expect(steps.locator('li').nth(3)).toContainText('If no star appears, the bookmark name is wrong');
+  });
+
+  test('an in-app browser gets a Chrome warning', async ({ page }) => {
+    await page.addInitScript(() => Object.defineProperty(navigator, 'userAgent', { configurable: true, value: 'Mozilla/5.0 (Linux; Android 17) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/145.0.0.0 Mobile Safari/537.36; wv)' }));
+    await page.goto(SITE);
+    await expect(page.locator('#in-app-warning')).toBeVisible();
+    await expect(page.locator('#in-app-warning')).toContainText('needs Chrome itself');
+    await expect(page.locator('#in-app-warning')).toContainText('Open this page in Chrome first');
+  });
+
   test('nothing is wider than the screen', async ({ page }) => {
     await page.goto(SITE);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.viewport.width);
