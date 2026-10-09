@@ -641,7 +641,7 @@ ${HANDLE ? `<meta name="twitter:creator" content="@${HANDLE}">` : ''}
           <pre id="code">${loader.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</pre>
           <p><button class="button small" type="button" id="copy">Copy the code</button></p>
           <h3>Android (Chrome)</h3>
-          <p class="in-app-warning for-touch">Open this page in Chrome first. Links from other apps can open in a small Chrome window whose address bar will not let you type. Tap ⋮, then <strong>Open in Chrome browser</strong>.</p>
+          <p class="in-app-warning">Open this page in Chrome first. Links from other apps can open in a small Chrome window whose address bar will not let you type. Tap ⋮, then <strong>Open in Chrome browser</strong>.</p>
           <ol>
             <li>Tap <strong>Copy the code</strong>.</li>
             <li>Tap ⋮, then the star, to bookmark this page. Then tap the message that pops up at the bottom (<strong>Bookmark saved</strong>, or <strong>Edit</strong>) before it goes. (Missed it? Tap ⋮, then Bookmarks, then Mobile bookmarks, then ⋮ next to Kitchen Mode, then Edit.)</li>

@@ -131,7 +131,7 @@ Limits: copies installed before 27 Sep 2026 never report, since full-code bookma
 
 ## Site support
 
-Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup the bookmarklet uses. Sites that turn away plain requests were loaded in headless Chrome instead. `node scripts/check-sites.mjs` now does the whole check, running the bookmarklet itself.
+Checked on 27 Sep 2026 by loading a recipe page and running the same data lookup the bookmarklet uses. Sites that turn away plain requests were loaded in headless Chrome instead. `node scripts/check-sites.mjs` now does the whole check, running the bookmarklet itself. Run again on 9 Oct 2026 before shipping the new sentence and timer code: 70 of the 73 opened a recipe. delicious.com.au and taste.com.au turned the check away with a 403, and Waitrose with a connection error, so those three are unknown for now rather than broken.
 
 - **Publish the data (73 sites):** the list, with the recipe checked on each, lives in `tested` in `sites.mjs`. The 12 names in `featured` show on the landing page; the rest sit behind "N more sites".
 - **Don't publish usable data:** Nigella, Mary Berry, Smitten Kitchen, Hairy Bikers, Rick Stein and Inspired Taste publish none; Gordon Ramsay publishes recipes without their steps

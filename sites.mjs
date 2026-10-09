@@ -1,6 +1,6 @@
 // Recipe pages checked to publish the data Kitchen Mode reads (see README). build.mjs lists them on the landing page,
 // and `node scripts/check-sites.mjs` runs the local km.js on each to check they still work.
-export const testedOn = '27 Sep 2026';
+export const testedOn = '9 Oct 2026';
 export const tested = [
   ['Allrecipes', 'https://www.allrecipes.com/recipe/10813/best-chocolate-chip-cookies/'],
   ['Barefoot Contessa', 'https://barefootcontessa.com/recipes/cheddar-corn-chowder'],

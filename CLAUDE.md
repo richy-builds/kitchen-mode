@@ -31,6 +31,7 @@ Every installed bookmark loads `km.js` from https://kitchen-mode.com (or https:/
 ## Gotchas
 
 - `build.mjs` strips comments with plain text matching. Never put `/*` or a line starting `//` inside a string, template or regex in `kitchen-mode.js`. The build refuses to write a km.js that doesn't parse.
+- The page's own script sits in a template literal in `build.mjs`, so every backslash in it needs doubling: `\\d` writes `\d`, while `\)` silently writes `)` and breaks the regex, which takes the whole page script down with it. The parse check covers km.js only, not the page script, so a broken page script is only caught by the tests.
 - The build writes km.js as ASCII, with `\u` escapes, because a script served without a charset is read in the page's own encoding.
 - `package.json` has no `build` script on purpose, because Vercel would run it. `vercel.json` skips the install, so deploys stay static files.
 - Claude Code on the web: `@playwright/test` is pinned to match the Chromium preinstalled in `/opt/pw-browsers`. Don't run `playwright install` there. If the browser is missing, set the pin to the version `npm ls -g playwright` reports. Recipe sites and the live site are blocked there, and Chromium doesn't trust the proxy for web fonts, so `check-sites` and live checks need the user's machine, and screenshots show fallback fonts.
