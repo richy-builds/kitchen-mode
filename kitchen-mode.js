@@ -47,7 +47,7 @@
     const visit = n => {
       if (!n || typeof n !== 'object') return;
       if (Array.isArray(n)) { n.forEach(visit); return; }
-      if ([].concat(n['@type'] || []).includes('Recipe')) found.push(n);
+      if ([].concat(n['@type'] || []).some(type => type === 'Recipe' || type === 'schema:Recipe' || /[\/#]Recipe$/.test(type))) found.push(n);
       visit(n['@graph']);
       visit(n.mainEntity);
     };
@@ -75,11 +75,20 @@
   };
 
   // One sentence at a time; very short sentences ride along with the one before.
-  const splitSentences = text => text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(“‘])/).reduce((out, s) => {
-    if (out.length && s.length < 25) out[out.length - 1] += ' ' + s;
-    else out.push(s);
-    return out;
-  }, []);
+  const splitSentences = text => {
+    const out = [], boundary = /[.!?]\s+(?=[A-Z0-9"'(“‘])/g;
+    let last = 0, match;
+    while ((match = boundary.exec(text))) {
+      out.push(text.slice(last, match.index + 1));
+      last = boundary.lastIndex;
+    }
+    out.push(text.slice(last));
+    return out.reduce((sentences, s) => {
+      if (sentences.length && s.length < 25) sentences[sentences.length - 1] += ' ' + s;
+      else sentences.push(s);
+      return sentences;
+    }, []);
+  };
 
   const NUMBER_WORDS = {
     a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -89,7 +98,7 @@
   const UNIT = { s: 1, m: 60, h: 3600 };
   // "8–10 mins", "1 hr 30 mins", "1½ hours", "1 1/2 hours", "half an hour", "an hour and a half".
   // Not preceded by a letter, digit or slash, so "1/2 hour" is never read as "2 hour".
-  const TIME_RE = /(?<![\w./])((?:\d+(?:\.\d+)?(?!\/))?\s*(?:[½¼¾]|[13]\/[24])|\d+(?:\.\d+)?|half an?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|–|—|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b(?:\s+(and a half)\b|\s+(?:and\s+)?(\d+)\s*(secs?|seconds|min(?:ute)?s?)\b)?/gi;
+  const TIME_RE = /(^|[^\w./])((?:\d+(?:\.\d+)?(?!\/))?\s*(?:[½¼¾]|[13]\/[24])|\d+(?:\.\d+)?|half an?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|–|—|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b(?:\s+(and a half)\b|\s+(?:and\s+)?(\d+)\s*(secs?|seconds|min(?:ute)?s?)\b)?/gi;
   const amount = s => {
     s = s.toLowerCase();
     if (s in NUMBER_WORDS) return NUMBER_WORDS[s];
@@ -98,8 +107,8 @@
   };
   // Ranges start the timer at the low end, so you check early rather than late.
   const toSeconds = m => {
-    const unit = UNIT[m[2][0].toLowerCase()], small = m[4] ? UNIT[m[5][0].toLowerCase()] : unit;
-    return amount(m[1]) * unit + (m[3] ? unit / 2 : 0) + (small < unit ? m[4] * small : 0);
+    const unit = UNIT[m[3][0].toLowerCase()], small = m[6] ? UNIT[m[6][0].toLowerCase()] : unit;
+    return amount(m[2]) * unit + (m[4] ? unit / 2 : 0) + (small < unit ? m[5] * small : 0);
   };
 
   const STOP = new Set(`and or of the to for with into in on at from about plus extra few some small medium large big
@@ -228,6 +237,7 @@
   let pos = -1; // -1 = ingredients overview, beats.length = finished
   const ticked = new Set();
   const origTitle = document.title;
+  let minimised = false;
 
   /* ---------- timers ---------- */
   const timers = [];
@@ -439,17 +449,18 @@
     const out = [];
     let last = 0;
     for (const m of text.matchAll(TIME_RE)) {
+      const prefix = m[1].length, match = m[0].slice(prefix), index = m.index + prefix;
       const secs = Math.round(toSeconds(m));
       if (!(secs > 0)) continue;
-      const key = `${si}.${bi}.${m.index}`;
-      const verb = verbBefore(text.slice(0, m.index));
+      const key = `${si}.${bi}.${index}`;
+      const verb = verbBefore(text.slice(0, index));
       const label = verb ? `Step ${si + 1} · ${verb}` : `Step ${si + 1}`;
-      out.push(text.slice(last, m.index), h('button', {
+      out.push(text.slice(last, index), h('button', {
         class: timers.some(t => t.key === key) ? 'chip started' : 'chip',
         'data-key': key,
         onclick: e => { e.stopPropagation(); startTimer(secs, label, key, [verb, si + 1]); },
-      }, '⏱︎ ', m[0]));
-      last = m.index + m[0].length;
+      }, '⏱︎ ', match));
+      last = index + match.length;
     }
     out.push(text.slice(last));
     return out;
@@ -547,7 +558,7 @@
       bar.firstChild.style.width = `${(doneCount / total) * 100}%`;
     });
     const on = stage.querySelector('.s.on');
-    stage.scrollTo({ top: on ? on.offsetTop - stage.clientHeight / 2 + on.offsetHeight / 2 : 0, behavior: 'smooth' });
+    stage.scrollTo({ top: on ? on.offsetTop - stage.clientHeight / 2 + on.offsetHeight / 2 : 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   };
   const next = () => { if (pos < beats.length) { pos++; render(); } };
   const back = () => { if (pos > -1) { pos--; render(); } };
@@ -594,13 +605,13 @@
     e.preventDefault();
     e.stopImmediatePropagation();
   };
-  let touchX = null;
-  stage.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
+  let touchX = null, touchY = null;
+  stage.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, { passive: true });
   stage.addEventListener('touchend', e => {
     if (touchX == null) return;
-    const dx = e.changedTouches[0].clientX - touchX;
-    touchX = null;
-    if (Math.abs(dx) > 60) (dx < 0 ? next : back)();
+    const dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
+    touchX = touchY = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? next : back)();
   });
   root.addEventListener('pointerdown', wake, true);
   root.addEventListener('wheel', wake, { capture: true, passive: true });
@@ -718,7 +729,7 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
   document.documentElement.append(host);
 
   const prevOverflow = document.documentElement.style.overflow;
-  let watcher = null, minimised = false, openedAt = 0;
+  let watcher = null, openedAt = 0;
   const open = () => {
     minimised = false;
     openedAt = Date.now();
@@ -752,7 +763,7 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
     document.removeEventListener('visibilitychange', onVisible);
     host.remove();
     document.title = origTitle;
-    audio?.close?.();
+    audio?.close?.().catch(() => {});
     try { speechSynthesis.cancel(); } catch {}
     delete window.__kitchenMode;
   };

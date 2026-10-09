@@ -103,6 +103,12 @@ test.describe('the loader bookmark', () => {
     await expect(page.locator('kitchen-mode h1')).toHaveText('Bean stew');
   });
 
+  test('built km.js has no lookbehind or post ES2017 syntax', () => {
+    const built = readFileSync(new URL('../km.js', import.meta.url), 'utf8');
+    expect(built).not.toMatch(/\(\?<([=!])/);
+    expect(built).not.toMatch(/\(\?<\w+>|\\p\{[^}]+\}/);
+  });
+
   test('leaves a page with no recipe alone and says so', async ({ page, pages, counts }) => {
     pages.set('/recipe', '<!doctype html><title>Not a recipe</title><p>Just words</p>');
     await page.goto(`${RECIPES}/recipe`);
@@ -121,6 +127,9 @@ test.describe('finding the recipe', () => {
     'a Yoast @graph': { '@context': 'https://schema.org', '@graph': [{ '@type': 'WebPage' }, stew] },
     'a mainEntity': { '@type': 'WebPage', mainEntity: stew },
     'a list of types': { ...stew, '@type': ['Recipe', 'NewsArticle'] },
+    'schema-prefixed type': { ...stew, '@type': 'schema:Recipe' },
+    'schema.org IRI type': { ...stew, '@type': 'https://schema.org/Recipe' },
+    'fragment IRI type': { ...stew, '@type': 'https://schema.org/Recipe#Recipe' },
   };
   for (const [shape, data] of Object.entries(shapes)) {
     test(`in ${shape}`, async ({ page, pages }) => {

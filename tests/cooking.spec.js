@@ -140,6 +140,12 @@ test.describe('on a phone', () => {
     await expect(view.current).toHaveText('Add the onion and cook until soft and golden.');
     await swipe(100, 300);
     await expect(view.current).toHaveText('Heat the oil in a large pan over a medium heat.');
+    await view.stage.evaluate(stage => {
+      const at = (x, y) => [new Touch({ identifier: 1, target: stage, clientX: x, clientY: y })];
+      stage.dispatchEvent(new TouchEvent('touchstart', { touches: at(100, 100), changedTouches: at(100, 100), bubbles: true }));
+      stage.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: at(180, 260), bubbles: true }));
+    });
+    await expect(view.current).toHaveText('Heat the oil in a large pan over a medium heat.');
   });
 
   test('nothing is wider than the screen', async ({ page, pages }) => {

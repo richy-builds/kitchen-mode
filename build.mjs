@@ -27,8 +27,8 @@ const source = readFileSync(new URL('./kitchen-mode.js', import.meta.url), 'utf8
   .replace('%BUILD%', BUILD)
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .split('\n')
-  .map(line => line.trim())
-  .filter(line => line && !line.startsWith('//'))
+  .map(line => line.trimEnd())
+  .filter(line => line.trim() && !line.trimStart().startsWith('//'))
   .join('\n')
   // A script served without a charset is read in the page's own encoding, which isn't always UTF-8, and one mangled
   // "½" stops the whole file parsing. So km.js is written as ASCII, with anything else as a \u escape.
@@ -804,9 +804,11 @@ function startTest() {
     if (!window.__kitchenMode) { trying = false; return; }
     if (trying) return;
     clearInterval(check);
+    clearTimeout(timeout);
     count('test_passed', { loader: !!document.querySelector('script[src$="/km.js"]'), touch: matchMedia('(pointer: coarse)').matches });
     testCue.innerHTML = '<span class="done">It works.</span> Close it, then use it the same way on any recipe.';
   }, 400);
+  var timeout = setTimeout(function () { clearInterval(check); }, 5 * 60 * 1000);
 }
 startTest();
 addEventListener('hashchange', startTest);

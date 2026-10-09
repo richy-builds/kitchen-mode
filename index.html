@@ -693,529 +693,540 @@ count('page_viewed', { from: document.referrer ? new URL(document.referrer).host
 
 function runKitchenMode() {
 (() => {
-const tag = document.currentScript;
-if (tag?.hasAttribute('data-km-handled')) return;
-for (const s of document.scripts) {
-if (s !== tag && /\/km\.js(?:[?#]|$)/.test(s.src)) s.setAttribute('data-km-handled', '');
-}
-if (window.__kitchenMode) { window.__kitchenMode.close(); return; }
-const loader = !!tag?.src;
-const touch = matchMedia('(pointer: coarse)').matches;
-const h = (tag, props = {}, ...kids) => {
-const el = document.createElement(tag);
-for (const [k, v] of Object.entries(props)) {
-if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
-else el.setAttribute(k, v);
-}
-for (const kid of kids.flat(Infinity)) {
-if (kid != null && kid !== false) el.append(kid);
-}
-return el;
-};
-const clean = s => (new DOMParser().parseFromString(String(s ?? ''), 'text/html').body.textContent || '')
-.replace(/\s+/g, ' ').trim();
-const toast = msg => {
-const t = document.createElement('div');
-t.textContent = msg;
-t.style.cssText = 'all:initial;position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:2147483647;' +
-'background:#1f1a14;color:#fff;font:500 16px/1.4 system-ui,sans-serif;padding:12px 18px;border-radius:12px;' +
-'box-shadow:0 8px 30px rgba(0,0,0,.25)';
-document.documentElement.append(t);
-setTimeout(() => t.remove(), 3500);
-};
-const findRecipe = () => {
-const found = [];
-const visit = n => {
-if (!n || typeof n !== 'object') return;
-if (Array.isArray(n)) { n.forEach(visit); return; }
-if ([].concat(n['@type'] || []).includes('Recipe')) found.push(n);
-visit(n['@graph']);
-visit(n.mainEntity);
-};
-for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
-try { visit(JSON.parse(s.textContent)); } catch {}
-}
-return found.find(r => r.recipeInstructions) || null;
-};
-const getSteps = instructions => {
-const steps = [];
-const walk = (x, section) => {
-if (!x) return;
-if (Array.isArray(x)) { x.forEach(y => walk(y, section)); return; }
-if (typeof x === 'string') {
-x.split(/\n+|<br\s*\/?>|<\/p>|<\/li>/i).forEach(t => walk({ text: t }, section));
-return;
-}
-if (x.itemListElement) { walk(x.itemListElement, clean(x.name) || section); return; }
-const text = clean(x.text || x.name).replace(/^(?:step\s*\d+[.:)]?|\d+[.)])\s+/i, '');
-if (text) steps.push({ text, section });
-};
-walk(instructions, '');
-return steps;
-};
-const splitSentences = text => text.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(\u201c\u2018])/).reduce((out, s) => {
-if (out.length && s.length < 25) out[out.length - 1] += ' ' + s;
-else out.push(s);
-return out;
-}, []);
-const NUMBER_WORDS = {
-a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
-fifteen: 15, twenty: 20, thirty: 30, forty: 40, 'forty-five': 45, 'half a': 0.5, 'half an': 0.5,
-};
-const FRACTIONS = { '\u00bd': 0.5, '\u00bc': 0.25, '\u00be': 0.75, '1/2': 0.5, '1/4': 0.25, '3/4': 0.75 };
-const UNIT = { s: 1, m: 60, h: 3600 };
-const TIME_RE = /(?<![\w./])((?:\d+(?:\.\d+)?(?!\/))?\s*(?:[\u00bd\u00bc\u00be]|[13]\/[24])|\d+(?:\.\d+)?|half an?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|\u2013|\u2014|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b(?:\s+(and a half)\b|\s+(?:and\s+)?(\d+)\s*(secs?|seconds|min(?:ute)?s?)\b)?/gi;
-const amount = s => {
-s = s.toLowerCase();
-if (s in NUMBER_WORDS) return NUMBER_WORDS[s];
-const [, whole = 0, frac] = /^(?:(\d+(?:\.\d+)?)(?!\/))?\s*(.*)$/.exec(s);
-return +whole + (FRACTIONS[frac] || 0);
-};
-const toSeconds = m => {
-const unit = UNIT[m[2][0].toLowerCase()], small = m[4] ? UNIT[m[5][0].toLowerCase()] : unit;
-return amount(m[1]) * unit + (m[3] ? unit / 2 : 0) + (small < unit ? m[4] * small : 0);
-};
-const STOP = new Set(`and or of the to for with into in on at from about plus extra few some small medium large big
-handful pinch dash splash good quality fresh freshly dried ground hot cold warm room temperature chopped finely
-roughly thinly thickly sliced diced grated crushed minced peeled deseeded trimmed halved quartered torn picked
-beaten melted softened cubed shredded rinsed drained cooked uncooked boneless skinless serve serving garnish
-optional taste tbsp tsp tablespoon tablespoons teaspoon teaspoons cup cups can cans tin tins pack packs bunch
-bunches clove cloves rasher rashers sprig sprigs slice slices stick sticks piece pieces litre litres pint pints`
-.split(/\s+/));
-const keywords = s => [...new Set(s.toLowerCase().replace(/\([^()]*\)/g, ' ').replace(/\([^()]*\)/g, ' ').split(/[^a-z\u00e0-\u00ff]+/)
-.filter(w => w.length >= 3 && !STOP.has(w))
-.map(w => (w.length > 3 ? w.replace(/(?:es|s)$/, '') : w)))];
-const QTY_RE = /^([\d\u00bc-\u00be\u2153-\u215e][\d\u00bc-\u00be\u2153-\u215e.,/\-\u2013\s]*(?:(?:kg|g|mg|ml|l|litres?|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|pints?)\b)?)\s*/i;
-const formatIngredient = text => {
-const m = text.match(QTY_RE);
-return m ? [h('b', {}, m[1].trim()), ' ', text.slice(m[0].length)] : [text];
-};
-const duration = iso => {
-const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?/.exec(iso || '');
-if (!m) return '';
-const mins = (+(m[1] || 0) * 24 + +(m[2] || 0)) * 60 + +(m[3] || 0), hrs = Math.floor(mins / 60);
-return [hrs && `${hrs} hr`, mins % 60 && `${mins % 60} min`].filter(Boolean).join(' ');
-};
-const recipe = findRecipe();
-const steps = recipe ? getSteps(recipe.recipeInstructions).map(s => ({ ...s, sentences: splitSentences(s.text) })) : [];
-try {
-if (location.hostname) fetch('https://kitchen-mode.com/relay/i/v0/e/', {
-method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
-body: JSON.stringify({
-api_key: 'phc_uF8Cd9E2zcnwqyMChuGw4fkYP7X366FWh2LGLTuARbpB', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
-properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-10-09', loader,
-touch, $process_person_profile: false },
-}),
-}).catch(() => {});
-} catch {}
-if (!steps.length) { toast("Kitchen Mode couldn't find a recipe on this page."); return; }
-const title = clean(recipe.name) || document.title;
-const ingredients = [].concat(recipe.recipeIngredient || recipe.ingredients || [])
-.flatMap(s => String(s ?? '').split(/\n+/)).map(clean).filter(Boolean);
-const yieldText = String([].concat(recipe.recipeYield || [])[0] ?? '').trim();
-const [prep, cookTime, total] = [recipe.prepTime, recipe.cookTime, recipe.totalTime].map(duration);
-const meta = [
-yieldText && (/^\d+$/.test(yieldText) ? `Serves ${yieldText}` : clean(yieldText)),
-prep && `Prep ${prep}`,
-cookTime && `Cook ${cookTime}`,
-!prep && !cookTime && total && `Total ${total}`,
-].filter(Boolean).join(' \u00b7 ');
-const image = (() => {
-let i = [].concat(recipe.image || [])[0];
-if (i && typeof i === 'object') i = i.url || i.contentUrl;
-return typeof i === 'string' ? i : '';
-})();
-const ingredientKeys = ingredients.map(keywords);
-const keyCount = {};
-ingredientKeys.flat().forEach(k => { keyCount[k] = (keyCount[k] || 0) + 1; });
-const matchKeys = ingredientKeys.map(ks => {
-const unique = ks.filter(k => keyCount[k] === 1);
-return unique.length ? unique : ks.slice(-1);
-});
-const neededFor = sentence => {
-const t = sentence.toLowerCase();
-return ingredients.filter((_, i) => matchKeys[i].some(k => new RegExp('\\b' + k).test(t)));
-};
-const READY = 'cooked|cooled|chilled|softened|melted|toasted|soaked|marinated|boiled|leftover|defrosted|thawed|room temperature';
-const READY_RE = new RegExp(`\\b(?:${READY})\\b(?! sesame oil)`, 'i');
-const NEXT = '(?!(?:the|a|an|and|or|but|so|is|are|was|were|will|should|can|has|have|it|that|which|if|when|while|with|to|into|in|on|onto|over|of|off|up|out|by|for|from|at|as|then|until|before|after|back|through|together)\\b)';
-const USES_RE = new RegExp(`\\b(?:the|your|some|leftover)\\s+(?:[a-z-]+\\s+)?(?:${READY})\\s+(?!sesame oil)` +
-`(${NEXT}[a-z-]+(?:\\s+${NEXT}(?![a-z-]+ly\\b)[a-z-]+){0,2})`, 'gi');
-const WAIT_RE = /\b(?:chill|marinat|soak|rest|refrigerat|fridge|freez|prove|proof|rise|infuse|steep|cool|stand)/i;
-const LONG_RE = /\bovernight\b|\b(?:the )?(?:day|night) before\b/i;
-const STORE_RE = /\b(?:store|storage|from frozen|leftovers|keeps?|reheat)\b/i;
-const WANTS_HOT = /\bpre-?heated\s+(oven|grill|broiler)\b|\b(oven|grill|broiler)\b[^.]{0,30}\bpre-?heated\b/i;
-const TURNS_ON = /\bpre-?heat(?!ed)|\bheat (?:the |your |an? )?(?:oven|grill|broiler)|\b(?:oven|grill|broiler)\s+(?:on\b|to\s+\d)|\bturn on (?:the )?(?:oven|grill)/i;
-const TEMP_RE = /\b\d{2,3}\s?\u00b0?\s?[CF]\b(?:\s?fan)?|\bgas(?: mark)? \d\b/i;
-const before = [];
-const readyIngs = ingredients.filter(i => READY_RE.test(i));
-readyIngs.forEach(i => before.push({ tag: 'Have ready', body: formatIngredient(i) }));
-let earlier = '';
-const waited = new Set();
-steps.forEach((s, si) => s.sentences.forEach(sentence => {
-for (const m of sentence.matchAll(USES_RE)) {
-const words = m[1].toLowerCase().split(/\s+/).map(w => new RegExp('\\b' + w.replace(/(?:es|s)$/, ''), 'i'));
-if (!words.some(w => w.test(earlier) || readyIngs.some(i => w.test(i)))) {
-before.push({ tag: `Step ${si + 1} uses`, body: m[0].replace(/^(?:your|some)\s+/i, 'the ') });
-}
-}
-const long = !waited.has(si) && !STORE_RE.test(sentence) && (LONG_RE.test(sentence) ||
-(WAIT_RE.test(sentence.split(/\buntil\b/i)[0]) && [...sentence.matchAll(TIME_RE)].some(m => toSeconds(m) >= 3600)));
-if (long) { waited.add(si); before.push({ tag: `Long wait \u00b7 step ${si + 1}`, body: sentence }); }
-earlier += ' ' + sentence;
-}));
-const hotStep = steps.findIndex(s => WANTS_HOT.test(s.text));
-if (hotStep >= 0 && !steps.some(s => TURNS_ON.test(s.text))) {
-const [, a, b] = WANTS_HOT.exec(steps[hotStep].text);
-const temp = steps.map(s => s.text.match(TEMP_RE)?.[0]).find(Boolean);
-before.push({
-tag: (a || b)[0].toUpperCase() + (a || b).slice(1).toLowerCase(),
-body: `Heat it${temp ? ` to ${temp}` : ''} now. Step ${hotStep + 1} wants it hot, and no step says to turn it on.`,
-});
-}
-const beats = [];
-steps.forEach((s, si) => s.sentences.forEach((_, bi) => beats.push({ si, bi })));
-let pos = -1; // -1 = ingredients overview, beats.length = finished
-const ticked = new Set();
-const origTitle = document.title;
-const timers = [];
-let audio;
-const unlockAudio = () => {
-try { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch {}
-};
-const beep = (out, at = audio?.currentTime) => {
-if (!audio || !out) return;
-[0, 0.25, 0.5].forEach(d => {
-const osc = audio.createOscillator(), gain = audio.createGain();
-osc.type = 'square';
-osc.frequency.value = 1760;
-gain.gain.setValueAtTime(0.0001, at + d);
-gain.gain.exponentialRampToValueAtTime(0.25, at + d + 0.02);
-gain.gain.exponentialRampToValueAtTime(0.0001, at + d + 0.2);
-osc.connect(gain).connect(out);
-osc.start(at + d);
-osc.stop(at + d + 0.22);
-});
-};
-const say = text => {
-try {
-const u = new SpeechSynthesisUtterance(text);
-const lang = document.documentElement.lang;
-u.lang = /^en\b/i.test(lang) ? lang : 'en';
-speechSynthesis.speak(u);
-} catch {}
-};
-let voiceReady = false;
-const unlockVoice = () => {
-if (voiceReady) return;
-voiceReady = true;
-try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {}
-};
-const speechOf = (verb, n) => `${verb ? `${verb}, step` : 'Step'} ${n}. Time's up.`;
-const VOICE = null;
-let alice;
-const loadAlice = () => alice ||= new Promise((ok, no) => {
-if (!VOICE?.mp3) return no();
-const bytes = Uint8Array.from(atob(VOICE.mp3), c => c.charCodeAt(0));
-audio.decodeAudioData(bytes.buffer, ok, no)?.catch?.(() => {});
-}).then(buf => {
-const data = buf.getChannelData(0);
-let i = 0;
-while (i < data.length && Math.abs(data[i]) < VOICE.thr) i++;
-return { buf, shift: i / buf.sampleRate - VOICE.first };
-});
-const bookVoice = t => {
-const [verb, n] = t.voice;
-const pieces = [verb.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('caramelize', 'caramelise'), String(n), 'up'].filter(Boolean);
-loadAlice().then(({ buf, shift }) => {
-let when = t.at + 0.9;
-if (!timers.includes(t) || when < audio.currentTime || !pieces.every(p => VOICE.clips[p])) return;
-pieces.forEach((p, i) => {
-const [start, dur] = VOICE.clips[p], src = audio.createBufferSource();
-src.buffer = buf;
-src.connect(t.out);
-src.start(when, start + shift, dur);
-when += dur + (pieces[i + 1] === 'up' ? 0.18 : 0.05);
-});
-t.voiced = true;
-}).catch(() => {});
-};
-const VERB_RE = /\b(bake|roast|boil|simmer|cook|fry|grill|griddle|broil|rest|chill|marinate|soak|steam|poach|blanch|toast|brown|sear|braise|reduce|stir|whisk|knead|prove|proof|rise|cool|stand|microwave|saut[e\u00e9]|caramelise|caramelize|soften|melt|bubble|char|freeze|steep|infuse|blitz|blend|mix|beat)(?:s|ing)?\b/gi;
-const verbBefore = text => {
-const m = [...text.matchAll(VERB_RE)].pop();
-return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : '';
-};
-const clock = secs => {
-const s = Math.max(0, Math.ceil(secs));
-const hrs = Math.floor(s / 3600), mins = Math.floor((s % 3600) / 60), rest = String(s % 60).padStart(2, '0');
-return hrs ? `${hrs}:${String(mins).padStart(2, '0')}:${rest}` : `${mins}:${rest}`;
-};
-let ringingTitle = false;
-const tick = () => {
-const now = Date.now();
-for (const t of timers) {
-const left = (t.end - now) / 1000;
-if (left <= 0 && !t.ringing) {
-t.ringing = true;
-t.el.classList.add('ringing');
-setTimeout(() => { if (timers.includes(t) && !t.voiced) say(speechOf(...t.voice)); }, 900);
-}
-t.time.textContent = t.ringing ? "Time's up!" : clock(left);
-if (t.ringing && now - t.lastBeep > 2500) { t.lastBeep = now; beep(t.out); }
-}
-const ringing = timers.some(t => t.ringing);
-if (ringing !== ringingTitle) {
-ringingTitle = ringing;
-document.title = ringing ? `\u23f0 Time's up! ${origTitle}` : origTitle;
-}
-glanceTick(now);
-};
-const IDLE_MS = 10000;
-let lastTouch = Date.now(), glancing = '', shown = null, glanceOff = false;
-const glanceName = h('div', { class: 'g-name' });
-const glanceTime = h('div', { class: 'g-time' });
-const glanceMore = h('div', { class: 'g-more' });
-const glanceNow = h('p', { class: 'g-now' });
-const glanceNext = h('p', { class: 'g-next' });
-const keepSmall = h('button', { class: 'g-small', onclick: e => { e.stopPropagation(); glanceOff = true; wake(); } },
-'Keep timer small');
-const bigAgain = h('button', { class: 'pill big-again', hidden: '', onclick: e => { e.stopPropagation(); glanceOff = false; tick(); } },
-'Big timer: off');
-const glance = h('div', {
-class: 'glance',
-onclick: e => { e.stopPropagation(); if (glancing === 'ring') removeTimer(shown); else wake(); },
-}, glanceName, glanceTime, glanceMore, glanceNow, glanceNext, keepSmall);
-const hideGlance = () => { glancing = ''; shown = null; glance.className = 'glance'; };
-const wake = e => {
-if (e?.type === 'pointerdown' && glance.contains(e.target)) return;
-lastTouch = Date.now();
-if (glancing === 'wait') hideGlance();
-};
-const sentenceAt = i => beats[i] ? steps[beats[i].si].sentences[beats[i].bi].replace(/(\d)\s*([\u2013-])\s*(\d)/g, '$1\u2060$2\u2060$3') : '';
-const showNext = i => glanceNext.replaceChildren(...(beats[i] && i > 0 ? [
-h('span', { class: 'g-label' }, beats[i].si === beats[i - 1].si ? 'Next' : `Next \u00b7 Step ${beats[i].si + 1}`), sentenceAt(i),
-] : []));
-const glanceTick = now => {
-const ring = minimised ? null : timers.filter(t => t.ringing).sort((a, b) => a.end - b.end)[0];
-const running = timers.filter(t => !t.ringing).sort((a, b) => a.end - b.end);
-const mode = ring ? 'ring' : !minimised && !glanceOff && running.length && now - lastTouch > IDLE_MS ? 'wait' : '';
-bigAgain.hidden = !(glanceOff && timers.length);
-if (!mode) { if (glancing) hideGlance(); return; }
-const [first, ...rest] = ring ? [ring] : running;
-if (mode !== glancing || first !== shown) {
-glancing = mode;
-shown = first;
-glance.className = `glance on ${mode}`;
-glanceName.textContent = first.label;
-const [si, bi] = first.key.split('.').map(Number);
-const from = ring ? beats.findIndex(b => b.si === si && b.bi === bi) : pos;
-glanceNow.textContent = ring ? '' : sentenceAt(pos);
-showNext(from + 1);
-}
-glanceTime.textContent = ring ? "Time's up" : clock((first.end - now) / 1000);
-glanceMore.textContent = ring ? 'Tap to stop' : rest.map(t => `${t.label} ${clock((t.end - now) / 1000)}`).join('  \u00b7  ');
-};
-const syncChips = () => stage.querySelectorAll('.chip').forEach(c =>
-c.classList.toggle('started', timers.some(t => t.key === c.dataset.key)));
-const removeTimer = t => {
-const i = timers.indexOf(t);
-if (i < 0) return;
-timers.splice(i, 1);
-t.out?.disconnect();
-if (t.ringing) try { speechSynthesis.cancel(); } catch {}
-t.el.remove();
-syncChips();
-tick();
-if (minimised && !timers.length) close();
-};
-const RINGS_BOOKED = 36;
-const startTimer = (secs, label, key, voice) => {
-if (timers.some(t => t.key === key)) return;
-unlockAudio();
-unlockVoice();
-const t = { key, label, voice, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
-if (audio) {
-t.at = audio.currentTime + secs;
-t.out = audio.createGain();
-t.out.connect(audio.destination);
-for (let i = 0; i < RINGS_BOOKED; i++) beep(t.out, t.at + i * 2.5);
-t.lastBeep = t.end + (RINGS_BOOKED - 1) * 2500;
-bookVoice(t);
-}
-t.time = h('span', { class: 'time' }, clock(secs));
-t.el = h('div', {
-class: 'timer',
-onclick: e => { e.stopPropagation(); if (t.ringing) removeTimer(t); else if (minimised) open(); },
-},
-h('span', { class: 'label' }, label),
-t.time,
-h('button', { class: 'cancel', title: 'Cancel timer', 'aria-label': 'Cancel timer', onclick: e => { e.stopPropagation(); removeTimer(t); } }, '\u2715'));
-timers.push(t);
-tray.append(t.el);
-syncChips();
-tick();
-};
-const tickId = setInterval(tick, 250);
-const withTimers = (text, si, bi) => {
-const out = [];
-let last = 0;
-for (const m of text.matchAll(TIME_RE)) {
-const secs = Math.round(toSeconds(m));
-if (!(secs > 0)) continue;
-const key = `${si}.${bi}.${m.index}`;
-const verb = verbBefore(text.slice(0, m.index));
-const label = verb ? `Step ${si + 1} \u00b7 ${verb}` : `Step ${si + 1}`;
-out.push(text.slice(last, m.index), h('button', {
-class: timers.some(t => t.key === key) ? 'chip started' : 'chip',
-'data-key': key,
-onclick: e => { e.stopPropagation(); startTimer(secs, label, key, [verb, si + 1]); },
-}, '\u23f1\ufe0e ', m[0]));
-last = m.index + m[0].length;
-}
-out.push(text.slice(last));
-return out;
-};
-const fontSize = n =>
-n < 110 ? 'clamp(28px, min(4.4vw, 7vh), 64px)'
-: n < 240 ? 'clamp(24px, min(3.4vw, 5.6vh), 52px)'
-: n < 420 ? 'clamp(21px, min(2.8vw, 4.6vh), 42px)'
-: 'clamp(19px, min(2.2vw, 3.8vh), 34px)';
-const overview = () => h('section', { class: 'overview' },
-h('div', {},
-h('div', { class: 'eyebrow' }, 'Kitchen Mode'),
-h('h1', {}, title),
-meta && h('div', { class: 'meta' }, meta),
-before.length > 0 && h('div', { class: 'before' }, h('div', { class: 'stub' },
-h('div', { class: 'eyebrow' }, 'Before you start'),
-h('ul', {}, before.map(b => h('li', {}, h('span', { class: 'tag' }, b.tag), h('span', {}, b.body)))))),
-ingredients.length > 0 && [
-h('div', { class: 'eyebrow' }, 'Ingredients', h('span', { class: 'soft' }, ' \u00b7 tap to tick off')),
-h('ul', { class: 'ings' }, ingredients.map((ing, i) => h('li', {
-class: ticked.has(i) ? 'ticked' : '',
-onclick: e => {
-e.stopPropagation();
-if (ticked.has(i)) ticked.delete(i); else ticked.add(i);
-e.currentTarget.classList.toggle('ticked');
-},
-}, h('span', { class: 'box' }), h('span', {}, formatIngredient(ing))))),
-],
-h('button', { class: 'primary', onclick: e => { e.stopPropagation(); next(); } }, 'Start cooking \u2192')),
-image && h('img', { class: 'hero', src: image, alt: '' }));
-const cooking = () => {
-const { si, bi } = beats[pos];
-const step = steps[si];
-const need = neededFor(step.sentences[bi]);
-return h('section', { class: 'cook' },
-h('div', {},
-h('div', { class: 'eyebrow' }, `Step ${si + 1} of ${steps.length}`, step.section && ` \u00b7 ${step.section}`),
-h('p', { class: 'step', style: `font-size:${fontSize(step.text.length)}` },
-step.sentences.map((s, i) => [
-h('span', { class: i === bi ? 's on' : i < bi ? 's past' : 's' }, withTimers(s, si, i)), ' ',
-]))),
-h('aside', { class: 'need' }, h('div', { class: 'stub' },
-h('div', { class: 'eyebrow' }, "You'll need"),
-need.length
-? h('ul', {}, need.map(i => h('li', {}, formatIngredient(i))))
-: h('p', { class: 'none' }, 'Nothing new for this bit'))));
-};
-const finished = () => h('section', { class: 'done' },
-h('div', { class: 'receipt' }, h('div', { class: 'stub' },
-h('div', { class: 'head' }, h('span', {}, title), h('span', {}, `${steps.length}/${steps.length}`)),
-h('div', { class: 'eyebrow' }, 'All steps done'),
-h('h2', {}, 'Enjoy!'),
-h('div', { class: 'row' },
-h('button', { onclick: e => { e.stopPropagation(); pos = -1; render(); } }, 'Start again'),
-h('button', { class: 'primary', onclick: e => { e.stopPropagation(); close(); } }, 'Close Kitchen Mode')))));
-const bars = steps.map(() => h('i', {}, h('b')));
-const pill = h('span', { class: 'pill' }, '');
-const tray = h('div', { class: 'timers' });
-const stage = h('main', {
-class: 'stage',
-onclick: e => {
-if (e.target.closest('button, li')) return;
-const r = stage.getBoundingClientRect();
-(e.clientX - r.left < r.width * 0.3 ? back : next)();
-},
-});
-const root = h('div', { class: 'km' },
-h('header', {},
-h('div', { class: 'title' }, '\ud83c\udf73 ', title),
-pill,
-h('button', { class: 'x', title: 'Close (Esc)', 'aria-label': 'Close', onclick: () => close() }, '\u2715')),
-h('div', { class: 'progress' }, bars),
-stage,
-h('footer', {},
-h('button', { class: 'reopen', onclick: e => { e.stopPropagation(); open(); } }, 'Back to Kitchen Mode'),
-tray,
-bigAgain,
-h('div', { class: 'hint' }, touch
-? 'Tap right \u2192 next \u00b7 tap left \u2190 back'
-: 'Space or tap \u2192 next \u00b7 \u2190 back \u00b7 T timer \u00b7 Esc close')),
-glance);
-const render = () => {
-stage.replaceChildren(pos < 0 ? overview() : pos >= beats.length ? finished() : cooking());
-bars.forEach((bar, si) => {
-const total = steps[si].sentences.length;
-const doneCount = beats.filter((b, i) => b.si === si && i <= pos).length;
-bar.firstChild.style.width = `${(doneCount / total) * 100}%`;
-});
-const on = stage.querySelector('.s.on');
-stage.scrollTo({ top: on ? on.offsetTop - stage.clientHeight / 2 + on.offsetHeight / 2 : 0, behavior: 'smooth' });
-};
-const next = () => { if (pos < beats.length) { pos++; render(); } };
-const back = () => { if (pos > -1) { pos--; render(); } };
-let lock = null, wantLock = true;
-const setAwake = on => {
-pill.textContent = on ? '\u2600\ufe0e Screen stays on' : '\u263e Screen may sleep';
-pill.classList.toggle('off', !on);
-};
-const getLock = async () => {
-if (!('wakeLock' in navigator)) { setAwake(false); return; }
-try {
-const l = await navigator.wakeLock.request('screen');
-if (!wantLock || lock) { l.release().catch(() => {}); return; }
-lock = l;
-setAwake(true);
-l.addEventListener('release', () => { lock = null; setAwake(false); });
-} catch { setAwake(false); }
-};
-const onVisible = () => {
-if (document.visibilityState !== 'visible') return;
-if (wantLock && !lock) getLock();
-audio?.resume().catch(() => {});
-};
-const NEXT_KEYS = [' ', 'ArrowRight', 'ArrowDown', 'PageDown', 'Enter'];
-const BACK_KEYS = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
-const onKey = e => {
-if (e.metaKey || e.ctrlKey || e.altKey) return;
-wake();
-const k = e.key;
-if ((k === 'Enter' || k === ' ') && e.composedPath()[0]?.tagName === 'BUTTON') return;
-const ringing = timers.filter(t => t.ringing);
-if (NEXT_KEYS.includes(k)) { if (!e.repeat) next(); }
-else if (BACK_KEYS.includes(k)) { if (!e.repeat) back(); }
-else if (k === 'Escape') { if (ringing.length) ringing.forEach(removeTimer); else close(); }
-else if (k === 't' || k === 'T') { if (!e.repeat) stage.querySelector('.s.on .chip:not(.started)')?.click(); }
-else return;
-e.preventDefault();
-e.stopImmediatePropagation();
-};
-let touchX = null;
-stage.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });
-stage.addEventListener('touchend', e => {
-if (touchX == null) return;
-const dx = e.changedTouches[0].clientX - touchX;
-touchX = null;
-if (Math.abs(dx) > 60) (dx < 0 ? next : back)();
-});
-root.addEventListener('pointerdown', wake, true);
-root.addEventListener('wheel', wake, { capture: true, passive: true });
-root.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
-const host = document.createElement('kitchen-mode');
-const place = where => { host.style.cssText = `all:initial;position:fixed;${where};z-index:2147483647;display:block;`; };
-place('inset:0');
-const shadow = host.attachShadow({ mode: 'open' });
-shadow.append(h('style', {}, `
+  const tag = document.currentScript;
+  if (tag?.hasAttribute('data-km-handled')) return;
+  for (const s of document.scripts) {
+    if (s !== tag && /\/km\.js(?:[?#]|$)/.test(s.src)) s.setAttribute('data-km-handled', '');
+  }
+  if (window.__kitchenMode) { window.__kitchenMode.close(); return; }
+  const loader = !!tag?.src;
+  const touch = matchMedia('(pointer: coarse)').matches;
+  const h = (tag, props = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v);
+    }
+    for (const kid of kids.flat(Infinity)) {
+      if (kid != null && kid !== false) el.append(kid);
+    }
+    return el;
+  };
+  const clean = s => (new DOMParser().parseFromString(String(s ?? ''), 'text/html').body.textContent || '')
+    .replace(/\s+/g, ' ').trim();
+  const toast = msg => {
+    const t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'all:initial;position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:2147483647;' +
+      'background:#1f1a14;color:#fff;font:500 16px/1.4 system-ui,sans-serif;padding:12px 18px;border-radius:12px;' +
+      'box-shadow:0 8px 30px rgba(0,0,0,.25)';
+    document.documentElement.append(t);
+    setTimeout(() => t.remove(), 3500);
+  };
+  const findRecipe = () => {
+    const found = [];
+    const visit = n => {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) { n.forEach(visit); return; }
+      if ([].concat(n['@type'] || []).some(type => type === 'Recipe' || type === 'schema:Recipe' || /[\/#]Recipe$/.test(type))) found.push(n);
+      visit(n['@graph']);
+      visit(n.mainEntity);
+    };
+    for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+      try { visit(JSON.parse(s.textContent)); } catch {}
+    }
+    return found.find(r => r.recipeInstructions) || null;
+  };
+  const getSteps = instructions => {
+    const steps = [];
+    const walk = (x, section) => {
+      if (!x) return;
+      if (Array.isArray(x)) { x.forEach(y => walk(y, section)); return; }
+      if (typeof x === 'string') {
+        x.split(/\n+|<br\s*\/?>|<\/p>|<\/li>/i).forEach(t => walk({ text: t }, section));
+        return;
+      }
+      if (x.itemListElement) { walk(x.itemListElement, clean(x.name) || section); return; }
+      const text = clean(x.text || x.name).replace(/^(?:step\s*\d+[.:)]?|\d+[.)])\s+/i, '');
+      if (text) steps.push({ text, section });
+    };
+    walk(instructions, '');
+    return steps;
+  };
+  const splitSentences = text => {
+    const out = [], boundary = /[.!?]\s+(?=[A-Z0-9"'(\u201c\u2018])/g;
+    let last = 0, match;
+    while ((match = boundary.exec(text))) {
+      out.push(text.slice(last, match.index + 1));
+      last = boundary.lastIndex;
+    }
+    out.push(text.slice(last));
+    return out.reduce((sentences, s) => {
+      if (sentences.length && s.length < 25) sentences[sentences.length - 1] += ' ' + s;
+      else sentences.push(s);
+      return sentences;
+    }, []);
+  };
+  const NUMBER_WORDS = {
+    a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    fifteen: 15, twenty: 20, thirty: 30, forty: 40, 'forty-five': 45, 'half a': 0.5, 'half an': 0.5,
+  };
+  const FRACTIONS = { '\u00bd': 0.5, '\u00bc': 0.25, '\u00be': 0.75, '1/2': 0.5, '1/4': 0.25, '3/4': 0.75 };
+  const UNIT = { s: 1, m: 60, h: 3600 };
+  const TIME_RE = /(^|[^\w./])((?:\d+(?:\.\d+)?(?!\/))?\s*(?:[\u00bd\u00bc\u00be]|[13]\/[24])|\d+(?:\.\d+)?|half an?|an?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty-five|forty)(?:\s*(?:-|\u2013|\u2014|to|or)\s*\d+(?:\.\d+)?)?\s*(secs?|seconds|min(?:ute)?s?|h(?:ou)?rs?)\b(?:\s+(and a half)\b|\s+(?:and\s+)?(\d+)\s*(secs?|seconds|min(?:ute)?s?)\b)?/gi;
+  const amount = s => {
+    s = s.toLowerCase();
+    if (s in NUMBER_WORDS) return NUMBER_WORDS[s];
+    const [, whole = 0, frac] = /^(?:(\d+(?:\.\d+)?)(?!\/))?\s*(.*)$/.exec(s);
+    return +whole + (FRACTIONS[frac] || 0);
+  };
+  const toSeconds = m => {
+    const unit = UNIT[m[3][0].toLowerCase()], small = m[6] ? UNIT[m[6][0].toLowerCase()] : unit;
+    return amount(m[2]) * unit + (m[4] ? unit / 2 : 0) + (small < unit ? m[5] * small : 0);
+  };
+  const STOP = new Set(`and or of the to for with into in on at from about plus extra few some small medium large big
+    handful pinch dash splash good quality fresh freshly dried ground hot cold warm room temperature chopped finely
+    roughly thinly thickly sliced diced grated crushed minced peeled deseeded trimmed halved quartered torn picked
+    beaten melted softened cubed shredded rinsed drained cooked uncooked boneless skinless serve serving garnish
+    optional taste tbsp tsp tablespoon tablespoons teaspoon teaspoons cup cups can cans tin tins pack packs bunch
+    bunches clove cloves rasher rashers sprig sprigs slice slices stick sticks piece pieces litre litres pint pints`
+    .split(/\s+/));
+  const keywords = s => [...new Set(s.toLowerCase().replace(/\([^()]*\)/g, ' ').replace(/\([^()]*\)/g, ' ').split(/[^a-z\u00e0-\u00ff]+/)
+    .filter(w => w.length >= 3 && !STOP.has(w))
+    .map(w => (w.length > 3 ? w.replace(/(?:es|s)$/, '') : w)))];
+  const QTY_RE = /^([\d\u00bc-\u00be\u2153-\u215e][\d\u00bc-\u00be\u2153-\u215e.,/\-\u2013\s]*(?:(?:kg|g|mg|ml|l|litres?|tbsp|tsp|tablespoons?|teaspoons?|cups?|oz|lb|pints?)\b)?)\s*/i;
+  const formatIngredient = text => {
+    const m = text.match(QTY_RE);
+    return m ? [h('b', {}, m[1].trim()), ' ', text.slice(m[0].length)] : [text];
+  };
+  const duration = iso => {
+    const m = /^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?/.exec(iso || '');
+    if (!m) return '';
+    const mins = (+(m[1] || 0) * 24 + +(m[2] || 0)) * 60 + +(m[3] || 0), hrs = Math.floor(mins / 60);
+    return [hrs && `${hrs} hr`, mins % 60 && `${mins % 60} min`].filter(Boolean).join(' ');
+  };
+  const recipe = findRecipe();
+  const steps = recipe ? getSteps(recipe.recipeInstructions).map(s => ({ ...s, sentences: splitSentences(s.text) })) : [];
+  try {
+    if (location.hostname) fetch('https://kitchen-mode.com/relay/i/v0/e/', {
+      method: 'POST', mode: 'no-cors', credentials: 'omit', keepalive: true, referrerPolicy: 'no-referrer',
+      body: JSON.stringify({
+        api_key: 'phc_uF8Cd9E2zcnwqyMChuGw4fkYP7X366FWh2LGLTuARbpB', event: 'kitchen_mode_opened', distinct_id: Math.random().toString(36).slice(2),
+        properties: { site: location.hostname.replace(/^www\./, ''), found: steps.length > 0, build: '2026-10-09', loader,
+          touch, $process_person_profile: false },
+      }),
+    }).catch(() => {});
+  } catch {}
+  if (!steps.length) { toast("Kitchen Mode couldn't find a recipe on this page."); return; }
+  const title = clean(recipe.name) || document.title;
+  const ingredients = [].concat(recipe.recipeIngredient || recipe.ingredients || [])
+    .flatMap(s => String(s ?? '').split(/\n+/)).map(clean).filter(Boolean);
+  const yieldText = String([].concat(recipe.recipeYield || [])[0] ?? '').trim();
+  const [prep, cookTime, total] = [recipe.prepTime, recipe.cookTime, recipe.totalTime].map(duration);
+  const meta = [
+    yieldText && (/^\d+$/.test(yieldText) ? `Serves ${yieldText}` : clean(yieldText)),
+    prep && `Prep ${prep}`,
+    cookTime && `Cook ${cookTime}`,
+    !prep && !cookTime && total && `Total ${total}`,
+  ].filter(Boolean).join(' \u00b7 ');
+  const image = (() => {
+    let i = [].concat(recipe.image || [])[0];
+    if (i && typeof i === 'object') i = i.url || i.contentUrl;
+    return typeof i === 'string' ? i : '';
+  })();
+  const ingredientKeys = ingredients.map(keywords);
+  const keyCount = {};
+  ingredientKeys.flat().forEach(k => { keyCount[k] = (keyCount[k] || 0) + 1; });
+  const matchKeys = ingredientKeys.map(ks => {
+    const unique = ks.filter(k => keyCount[k] === 1);
+    return unique.length ? unique : ks.slice(-1);
+  });
+  const neededFor = sentence => {
+    const t = sentence.toLowerCase();
+    return ingredients.filter((_, i) => matchKeys[i].some(k => new RegExp('\\b' + k).test(t)));
+  };
+  const READY = 'cooked|cooled|chilled|softened|melted|toasted|soaked|marinated|boiled|leftover|defrosted|thawed|room temperature';
+  const READY_RE = new RegExp(`\\b(?:${READY})\\b(?! sesame oil)`, 'i');
+  const NEXT = '(?!(?:the|a|an|and|or|but|so|is|are|was|were|will|should|can|has|have|it|that|which|if|when|while|with|to|into|in|on|onto|over|of|off|up|out|by|for|from|at|as|then|until|before|after|back|through|together)\\b)';
+  const USES_RE = new RegExp(`\\b(?:the|your|some|leftover)\\s+(?:[a-z-]+\\s+)?(?:${READY})\\s+(?!sesame oil)` +
+    `(${NEXT}[a-z-]+(?:\\s+${NEXT}(?![a-z-]+ly\\b)[a-z-]+){0,2})`, 'gi');
+  const WAIT_RE = /\b(?:chill|marinat|soak|rest|refrigerat|fridge|freez|prove|proof|rise|infuse|steep|cool|stand)/i;
+  const LONG_RE = /\bovernight\b|\b(?:the )?(?:day|night) before\b/i;
+  const STORE_RE = /\b(?:store|storage|from frozen|leftovers|keeps?|reheat)\b/i;
+  const WANTS_HOT = /\bpre-?heated\s+(oven|grill|broiler)\b|\b(oven|grill|broiler)\b[^.]{0,30}\bpre-?heated\b/i;
+  const TURNS_ON = /\bpre-?heat(?!ed)|\bheat (?:the |your |an? )?(?:oven|grill|broiler)|\b(?:oven|grill|broiler)\s+(?:on\b|to\s+\d)|\bturn on (?:the )?(?:oven|grill)/i;
+  const TEMP_RE = /\b\d{2,3}\s?\u00b0?\s?[CF]\b(?:\s?fan)?|\bgas(?: mark)? \d\b/i;
+  const before = [];
+  const readyIngs = ingredients.filter(i => READY_RE.test(i));
+  readyIngs.forEach(i => before.push({ tag: 'Have ready', body: formatIngredient(i) }));
+  let earlier = '';
+  const waited = new Set();
+  steps.forEach((s, si) => s.sentences.forEach(sentence => {
+    for (const m of sentence.matchAll(USES_RE)) {
+      const words = m[1].toLowerCase().split(/\s+/).map(w => new RegExp('\\b' + w.replace(/(?:es|s)$/, ''), 'i'));
+      if (!words.some(w => w.test(earlier) || readyIngs.some(i => w.test(i)))) {
+        before.push({ tag: `Step ${si + 1} uses`, body: m[0].replace(/^(?:your|some)\s+/i, 'the ') });
+      }
+    }
+    const long = !waited.has(si) && !STORE_RE.test(sentence) && (LONG_RE.test(sentence) ||
+      (WAIT_RE.test(sentence.split(/\buntil\b/i)[0]) && [...sentence.matchAll(TIME_RE)].some(m => toSeconds(m) >= 3600)));
+    if (long) { waited.add(si); before.push({ tag: `Long wait \u00b7 step ${si + 1}`, body: sentence }); }
+    earlier += ' ' + sentence;
+  }));
+  const hotStep = steps.findIndex(s => WANTS_HOT.test(s.text));
+  if (hotStep >= 0 && !steps.some(s => TURNS_ON.test(s.text))) {
+    const [, a, b] = WANTS_HOT.exec(steps[hotStep].text);
+    const temp = steps.map(s => s.text.match(TEMP_RE)?.[0]).find(Boolean);
+    before.push({
+      tag: (a || b)[0].toUpperCase() + (a || b).slice(1).toLowerCase(),
+      body: `Heat it${temp ? ` to ${temp}` : ''} now. Step ${hotStep + 1} wants it hot, and no step says to turn it on.`,
+    });
+  }
+  const beats = [];
+  steps.forEach((s, si) => s.sentences.forEach((_, bi) => beats.push({ si, bi })));
+  let pos = -1; // -1 = ingredients overview, beats.length = finished
+  const ticked = new Set();
+  const origTitle = document.title;
+  let minimised = false;
+  const timers = [];
+  let audio;
+  const unlockAudio = () => {
+    try { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch {}
+  };
+  const beep = (out, at = audio?.currentTime) => {
+    if (!audio || !out) return;
+    [0, 0.25, 0.5].forEach(d => {
+      const osc = audio.createOscillator(), gain = audio.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 1760;
+      gain.gain.setValueAtTime(0.0001, at + d);
+      gain.gain.exponentialRampToValueAtTime(0.25, at + d + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + d + 0.2);
+      osc.connect(gain).connect(out);
+      osc.start(at + d);
+      osc.stop(at + d + 0.22);
+    });
+  };
+  const say = text => {
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      const lang = document.documentElement.lang;
+      u.lang = /^en\b/i.test(lang) ? lang : 'en';
+      speechSynthesis.speak(u);
+    } catch {}
+  };
+  let voiceReady = false;
+  const unlockVoice = () => {
+    if (voiceReady) return;
+    voiceReady = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } catch {}
+  };
+  const speechOf = (verb, n) => `${verb ? `${verb}, step` : 'Step'} ${n}. Time's up.`;
+  const VOICE = null;
+  let alice;
+  const loadAlice = () => alice ||= new Promise((ok, no) => {
+    if (!VOICE?.mp3) return no();
+    const bytes = Uint8Array.from(atob(VOICE.mp3), c => c.charCodeAt(0));
+    audio.decodeAudioData(bytes.buffer, ok, no)?.catch?.(() => {});
+  }).then(buf => {
+    const data = buf.getChannelData(0);
+    let i = 0;
+    while (i < data.length && Math.abs(data[i]) < VOICE.thr) i++;
+    return { buf, shift: i / buf.sampleRate - VOICE.first };
+  });
+  const bookVoice = t => {
+    const [verb, n] = t.voice;
+    const pieces = [verb.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace('caramelize', 'caramelise'), String(n), 'up'].filter(Boolean);
+    loadAlice().then(({ buf, shift }) => {
+      let when = t.at + 0.9;
+      if (!timers.includes(t) || when < audio.currentTime || !pieces.every(p => VOICE.clips[p])) return;
+      pieces.forEach((p, i) => {
+        const [start, dur] = VOICE.clips[p], src = audio.createBufferSource();
+        src.buffer = buf;
+        src.connect(t.out);
+        src.start(when, start + shift, dur);
+        when += dur + (pieces[i + 1] === 'up' ? 0.18 : 0.05);
+      });
+      t.voiced = true;
+    }).catch(() => {});
+  };
+  const VERB_RE = /\b(bake|roast|boil|simmer|cook|fry|grill|griddle|broil|rest|chill|marinate|soak|steam|poach|blanch|toast|brown|sear|braise|reduce|stir|whisk|knead|prove|proof|rise|cool|stand|microwave|saut[e\u00e9]|caramelise|caramelize|soften|melt|bubble|char|freeze|steep|infuse|blitz|blend|mix|beat)(?:s|ing)?\b/gi;
+  const verbBefore = text => {
+    const m = [...text.matchAll(VERB_RE)].pop();
+    return m ? m[1][0].toUpperCase() + m[1].slice(1).toLowerCase() : '';
+  };
+  const clock = secs => {
+    const s = Math.max(0, Math.ceil(secs));
+    const hrs = Math.floor(s / 3600), mins = Math.floor((s % 3600) / 60), rest = String(s % 60).padStart(2, '0');
+    return hrs ? `${hrs}:${String(mins).padStart(2, '0')}:${rest}` : `${mins}:${rest}`;
+  };
+  let ringingTitle = false;
+  const tick = () => {
+    const now = Date.now();
+    for (const t of timers) {
+      const left = (t.end - now) / 1000;
+      if (left <= 0 && !t.ringing) {
+        t.ringing = true;
+        t.el.classList.add('ringing');
+        setTimeout(() => { if (timers.includes(t) && !t.voiced) say(speechOf(...t.voice)); }, 900);
+      }
+      t.time.textContent = t.ringing ? "Time's up!" : clock(left);
+      if (t.ringing && now - t.lastBeep > 2500) { t.lastBeep = now; beep(t.out); }
+    }
+    const ringing = timers.some(t => t.ringing);
+    if (ringing !== ringingTitle) {
+      ringingTitle = ringing;
+      document.title = ringing ? `\u23f0 Time's up! ${origTitle}` : origTitle;
+    }
+    glanceTick(now);
+  };
+  const IDLE_MS = 10000;
+  let lastTouch = Date.now(), glancing = '', shown = null, glanceOff = false;
+  const glanceName = h('div', { class: 'g-name' });
+  const glanceTime = h('div', { class: 'g-time' });
+  const glanceMore = h('div', { class: 'g-more' });
+  const glanceNow = h('p', { class: 'g-now' });
+  const glanceNext = h('p', { class: 'g-next' });
+  const keepSmall = h('button', { class: 'g-small', onclick: e => { e.stopPropagation(); glanceOff = true; wake(); } },
+    'Keep timer small');
+  const bigAgain = h('button', { class: 'pill big-again', hidden: '', onclick: e => { e.stopPropagation(); glanceOff = false; tick(); } },
+    'Big timer: off');
+  const glance = h('div', {
+    class: 'glance',
+    onclick: e => { e.stopPropagation(); if (glancing === 'ring') removeTimer(shown); else wake(); },
+  }, glanceName, glanceTime, glanceMore, glanceNow, glanceNext, keepSmall);
+  const hideGlance = () => { glancing = ''; shown = null; glance.className = 'glance'; };
+  const wake = e => {
+    if (e?.type === 'pointerdown' && glance.contains(e.target)) return;
+    lastTouch = Date.now();
+    if (glancing === 'wait') hideGlance();
+  };
+  const sentenceAt = i => beats[i] ? steps[beats[i].si].sentences[beats[i].bi].replace(/(\d)\s*([\u2013-])\s*(\d)/g, '$1\u2060$2\u2060$3') : '';
+  const showNext = i => glanceNext.replaceChildren(...(beats[i] && i > 0 ? [
+    h('span', { class: 'g-label' }, beats[i].si === beats[i - 1].si ? 'Next' : `Next \u00b7 Step ${beats[i].si + 1}`), sentenceAt(i),
+  ] : []));
+  const glanceTick = now => {
+    const ring = minimised ? null : timers.filter(t => t.ringing).sort((a, b) => a.end - b.end)[0];
+    const running = timers.filter(t => !t.ringing).sort((a, b) => a.end - b.end);
+    const mode = ring ? 'ring' : !minimised && !glanceOff && running.length && now - lastTouch > IDLE_MS ? 'wait' : '';
+    bigAgain.hidden = !(glanceOff && timers.length);
+    if (!mode) { if (glancing) hideGlance(); return; }
+    const [first, ...rest] = ring ? [ring] : running;
+    if (mode !== glancing || first !== shown) {
+      glancing = mode;
+      shown = first;
+      glance.className = `glance on ${mode}`;
+      glanceName.textContent = first.label;
+      const [si, bi] = first.key.split('.').map(Number);
+      const from = ring ? beats.findIndex(b => b.si === si && b.bi === bi) : pos;
+      glanceNow.textContent = ring ? '' : sentenceAt(pos);
+      showNext(from + 1);
+    }
+    glanceTime.textContent = ring ? "Time's up" : clock((first.end - now) / 1000);
+    glanceMore.textContent = ring ? 'Tap to stop' : rest.map(t => `${t.label} ${clock((t.end - now) / 1000)}`).join('  \u00b7  ');
+  };
+  const syncChips = () => stage.querySelectorAll('.chip').forEach(c =>
+    c.classList.toggle('started', timers.some(t => t.key === c.dataset.key)));
+  const removeTimer = t => {
+    const i = timers.indexOf(t);
+    if (i < 0) return;
+    timers.splice(i, 1);
+    t.out?.disconnect();
+    if (t.ringing) try { speechSynthesis.cancel(); } catch {}
+    t.el.remove();
+    syncChips();
+    tick();
+    if (minimised && !timers.length) close();
+  };
+  const RINGS_BOOKED = 36;
+  const startTimer = (secs, label, key, voice) => {
+    if (timers.some(t => t.key === key)) return;
+    unlockAudio();
+    unlockVoice();
+    const t = { key, label, voice, end: Date.now() + secs * 1000, ringing: false, lastBeep: 0 };
+    if (audio) {
+      t.at = audio.currentTime + secs;
+      t.out = audio.createGain();
+      t.out.connect(audio.destination);
+      for (let i = 0; i < RINGS_BOOKED; i++) beep(t.out, t.at + i * 2.5);
+      t.lastBeep = t.end + (RINGS_BOOKED - 1) * 2500;
+      bookVoice(t);
+    }
+    t.time = h('span', { class: 'time' }, clock(secs));
+    t.el = h('div', {
+      class: 'timer',
+      onclick: e => { e.stopPropagation(); if (t.ringing) removeTimer(t); else if (minimised) open(); },
+    },
+      h('span', { class: 'label' }, label),
+      t.time,
+      h('button', { class: 'cancel', title: 'Cancel timer', 'aria-label': 'Cancel timer', onclick: e => { e.stopPropagation(); removeTimer(t); } }, '\u2715'));
+    timers.push(t);
+    tray.append(t.el);
+    syncChips();
+    tick();
+  };
+  const tickId = setInterval(tick, 250);
+  const withTimers = (text, si, bi) => {
+    const out = [];
+    let last = 0;
+    for (const m of text.matchAll(TIME_RE)) {
+      const prefix = m[1].length, match = m[0].slice(prefix), index = m.index + prefix;
+      const secs = Math.round(toSeconds(m));
+      if (!(secs > 0)) continue;
+      const key = `${si}.${bi}.${index}`;
+      const verb = verbBefore(text.slice(0, index));
+      const label = verb ? `Step ${si + 1} \u00b7 ${verb}` : `Step ${si + 1}`;
+      out.push(text.slice(last, index), h('button', {
+        class: timers.some(t => t.key === key) ? 'chip started' : 'chip',
+        'data-key': key,
+        onclick: e => { e.stopPropagation(); startTimer(secs, label, key, [verb, si + 1]); },
+      }, '\u23f1\ufe0e ', match));
+      last = index + match.length;
+    }
+    out.push(text.slice(last));
+    return out;
+  };
+  const fontSize = n =>
+    n < 110 ? 'clamp(28px, min(4.4vw, 7vh), 64px)'
+    : n < 240 ? 'clamp(24px, min(3.4vw, 5.6vh), 52px)'
+    : n < 420 ? 'clamp(21px, min(2.8vw, 4.6vh), 42px)'
+    : 'clamp(19px, min(2.2vw, 3.8vh), 34px)';
+  const overview = () => h('section', { class: 'overview' },
+    h('div', {},
+      h('div', { class: 'eyebrow' }, 'Kitchen Mode'),
+      h('h1', {}, title),
+      meta && h('div', { class: 'meta' }, meta),
+      before.length > 0 && h('div', { class: 'before' }, h('div', { class: 'stub' },
+        h('div', { class: 'eyebrow' }, 'Before you start'),
+        h('ul', {}, before.map(b => h('li', {}, h('span', { class: 'tag' }, b.tag), h('span', {}, b.body)))))),
+      ingredients.length > 0 && [
+        h('div', { class: 'eyebrow' }, 'Ingredients', h('span', { class: 'soft' }, ' \u00b7 tap to tick off')),
+        h('ul', { class: 'ings' }, ingredients.map((ing, i) => h('li', {
+          class: ticked.has(i) ? 'ticked' : '',
+          onclick: e => {
+            e.stopPropagation();
+            if (ticked.has(i)) ticked.delete(i); else ticked.add(i);
+            e.currentTarget.classList.toggle('ticked');
+          },
+        }, h('span', { class: 'box' }), h('span', {}, formatIngredient(ing))))),
+      ],
+      h('button', { class: 'primary', onclick: e => { e.stopPropagation(); next(); } }, 'Start cooking \u2192')),
+    image && h('img', { class: 'hero', src: image, alt: '' }));
+  const cooking = () => {
+    const { si, bi } = beats[pos];
+    const step = steps[si];
+    const need = neededFor(step.sentences[bi]);
+    return h('section', { class: 'cook' },
+      h('div', {},
+        h('div', { class: 'eyebrow' }, `Step ${si + 1} of ${steps.length}`, step.section && ` \u00b7 ${step.section}`),
+        h('p', { class: 'step', style: `font-size:${fontSize(step.text.length)}` },
+          step.sentences.map((s, i) => [
+            h('span', { class: i === bi ? 's on' : i < bi ? 's past' : 's' }, withTimers(s, si, i)), ' ',
+          ]))),
+      h('aside', { class: 'need' }, h('div', { class: 'stub' },
+        h('div', { class: 'eyebrow' }, "You'll need"),
+        need.length
+          ? h('ul', {}, need.map(i => h('li', {}, formatIngredient(i))))
+          : h('p', { class: 'none' }, 'Nothing new for this bit'))));
+  };
+  const finished = () => h('section', { class: 'done' },
+    h('div', { class: 'receipt' }, h('div', { class: 'stub' },
+      h('div', { class: 'head' }, h('span', {}, title), h('span', {}, `${steps.length}/${steps.length}`)),
+      h('div', { class: 'eyebrow' }, 'All steps done'),
+      h('h2', {}, 'Enjoy!'),
+      h('div', { class: 'row' },
+        h('button', { onclick: e => { e.stopPropagation(); pos = -1; render(); } }, 'Start again'),
+        h('button', { class: 'primary', onclick: e => { e.stopPropagation(); close(); } }, 'Close Kitchen Mode')))));
+  const bars = steps.map(() => h('i', {}, h('b')));
+  const pill = h('span', { class: 'pill' }, '');
+  const tray = h('div', { class: 'timers' });
+  const stage = h('main', {
+    class: 'stage',
+    onclick: e => {
+      if (e.target.closest('button, li')) return;
+      const r = stage.getBoundingClientRect();
+      (e.clientX - r.left < r.width * 0.3 ? back : next)();
+    },
+  });
+  const root = h('div', { class: 'km' },
+    h('header', {},
+      h('div', { class: 'title' }, '\ud83c\udf73 ', title),
+      pill,
+      h('button', { class: 'x', title: 'Close (Esc)', 'aria-label': 'Close', onclick: () => close() }, '\u2715')),
+    h('div', { class: 'progress' }, bars),
+    stage,
+    h('footer', {},
+      h('button', { class: 'reopen', onclick: e => { e.stopPropagation(); open(); } }, 'Back to Kitchen Mode'),
+      tray,
+      bigAgain,
+      h('div', { class: 'hint' }, touch
+        ? 'Tap right \u2192 next \u00b7 tap left \u2190 back'
+        : 'Space or tap \u2192 next \u00b7 \u2190 back \u00b7 T timer \u00b7 Esc close')),
+    glance);
+  const render = () => {
+    stage.replaceChildren(pos < 0 ? overview() : pos >= beats.length ? finished() : cooking());
+    bars.forEach((bar, si) => {
+      const total = steps[si].sentences.length;
+      const doneCount = beats.filter((b, i) => b.si === si && i <= pos).length;
+      bar.firstChild.style.width = `${(doneCount / total) * 100}%`;
+    });
+    const on = stage.querySelector('.s.on');
+    stage.scrollTo({ top: on ? on.offsetTop - stage.clientHeight / 2 + on.offsetHeight / 2 : 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  };
+  const next = () => { if (pos < beats.length) { pos++; render(); } };
+  const back = () => { if (pos > -1) { pos--; render(); } };
+  let lock = null, wantLock = true;
+  const setAwake = on => {
+    pill.textContent = on ? '\u2600\ufe0e Screen stays on' : '\u263e Screen may sleep';
+    pill.classList.toggle('off', !on);
+  };
+  const getLock = async () => {
+    if (!('wakeLock' in navigator)) { setAwake(false); return; }
+    try {
+      const l = await navigator.wakeLock.request('screen');
+      if (!wantLock || lock) { l.release().catch(() => {}); return; }
+      lock = l;
+      setAwake(true);
+      l.addEventListener('release', () => { lock = null; setAwake(false); });
+    } catch { setAwake(false); }
+  };
+  const onVisible = () => {
+    if (document.visibilityState !== 'visible') return;
+    if (wantLock && !lock) getLock();
+    audio?.resume().catch(() => {});
+  };
+  const NEXT_KEYS = [' ', 'ArrowRight', 'ArrowDown', 'PageDown', 'Enter'];
+  const BACK_KEYS = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
+  const onKey = e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    wake();
+    const k = e.key;
+    if ((k === 'Enter' || k === ' ') && e.composedPath()[0]?.tagName === 'BUTTON') return;
+    const ringing = timers.filter(t => t.ringing);
+    if (NEXT_KEYS.includes(k)) { if (!e.repeat) next(); }
+    else if (BACK_KEYS.includes(k)) { if (!e.repeat) back(); }
+    else if (k === 'Escape') { if (ringing.length) ringing.forEach(removeTimer); else close(); }
+    else if (k === 't' || k === 'T') { if (!e.repeat) stage.querySelector('.s.on .chip:not(.started)')?.click(); }
+    else return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  };
+  let touchX = null, touchY = null;
+  stage.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, { passive: true });
+  stage.addEventListener('touchend', e => {
+    if (touchX == null) return;
+    const dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
+    touchX = touchY = null;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) (dx < 0 ? next : back)();
+  });
+  root.addEventListener('pointerdown', wake, true);
+  root.addEventListener('wheel', wake, { capture: true, passive: true });
+  root.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+  const host = document.createElement('kitchen-mode');
+  const place = where => { host.style.cssText = `all:initial;position:fixed;${where};z-index:2147483647;display:block;`; };
+  place('inset:0');
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.append(h('style', {}, `
 :host { --bg:#fbf7f0; --panel:#f3ecdf; --ink:#1f1a14; --soft:#6b5f52; --line:#e6dccb; --dash:#d6c8b2; --accent:#d92d20; --on-accent:#fff; --accent-deep:#821b13; --chip:#ffe9b8; --amber:#ffb020; --on-amber:#1f1a14; --ring:#d92d20; --on-ring:#fff; --stub:#fff; --clip:linear-gradient(#63686e,#2b2e32); --shadow:rgb(52 36 20 / .2); --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace; }
 @media (prefers-color-scheme: dark) { :host { --bg:#15120e; --panel:#221c16; --ink:#f5eee4; --soft:#a3978a; --line:#352c23; --dash:#4a3f33; --accent:#ff7a6b; --on-accent:#15120e; --accent-deep:#99493f; --chip:#4a3510; --ring:#ff7a6b; --on-ring:#15120e; --stub:#2a231c; --clip:linear-gradient(#a3a8ae,#4a4e53); --shadow:rgb(0 0 0 / .5); } }
 * { box-sizing:border-box; }
@@ -1310,54 +1321,54 @@ footer { display:flex; align-items:center; gap:16px; padding:10px clamp(16px,3vw
 .mini .timer, .mini .reopen { box-shadow:0 8px 24px rgb(0 0 0 / .3); cursor:pointer; }
 .mini .reopen { display:block; padding:10px 14px; border-radius:999px; background:var(--ink); color:var(--bg); font:600 12px/1 var(--mono); letter-spacing:.08em; text-transform:uppercase; }
 @media (max-width: 820px) {
-.overview, .cook { grid-template-columns:1fr; align-items:start; }
-.cook > div { padding:0 0 24px; border-right:0; border-bottom:2px dashed var(--dash); }
-.title { font-size:12px; letter-spacing:.04em; }
-.pill { font-size:11px; padding:7px 10px; }
-.hero, .hint { display:none; }
-.before li { grid-template-columns:1fr; }
+  .overview, .cook { grid-template-columns:1fr; align-items:start; }
+  .cook > div { padding:0 0 24px; border-right:0; border-bottom:2px dashed var(--dash); }
+  .title { font-size:12px; letter-spacing:.04em; }
+  .pill { font-size:11px; padding:7px 10px; }
+  .hero, .hint { display:none; }
+  .before li { grid-template-columns:1fr; }
 }
 `), root);
-document.documentElement.append(host);
-const prevOverflow = document.documentElement.style.overflow;
-let watcher = null, minimised = false, openedAt = 0;
-const open = () => {
-minimised = false;
-openedAt = Date.now();
-root.classList.remove('mini');
-place('inset:0');
-document.documentElement.style.overflow = 'hidden';
-document.activeElement?.blur?.();
-window.addEventListener('keydown', onKey, true);
-watcher = window.CloseWatcher ? new CloseWatcher() : null;
-if (watcher) watcher.onclose = () => close();
-render();
-};
-const close = () => {
-window.removeEventListener('keydown', onKey, true);
-watcher?.destroy();
-watcher = null;
-document.documentElement.style.overflow = prevOverflow;
-if (timers.length) {
-minimised = true;
-root.classList.add('mini');
-place('right:12px;bottom:12px');
-return;
-}
-wantLock = false;
-lock?.release().catch(() => {});
-clearInterval(tickId);
-document.removeEventListener('visibilitychange', onVisible);
-host.remove();
-document.title = origTitle;
-audio?.close?.();
-try { speechSynthesis.cancel(); } catch {}
-delete window.__kitchenMode;
-};
-document.addEventListener('visibilitychange', onVisible);
-getLock();
-open();
-window.__kitchenMode = { close: () => { if (minimised) open(); else if (Date.now() - openedAt >= 1500) close(); } };
+  document.documentElement.append(host);
+  const prevOverflow = document.documentElement.style.overflow;
+  let watcher = null, openedAt = 0;
+  const open = () => {
+    minimised = false;
+    openedAt = Date.now();
+    root.classList.remove('mini');
+    place('inset:0');
+    document.documentElement.style.overflow = 'hidden';
+    document.activeElement?.blur?.();
+    window.addEventListener('keydown', onKey, true);
+    watcher = window.CloseWatcher ? new CloseWatcher() : null;
+    if (watcher) watcher.onclose = () => close();
+    render();
+  };
+  const close = () => {
+    window.removeEventListener('keydown', onKey, true);
+    watcher?.destroy();
+    watcher = null;
+    document.documentElement.style.overflow = prevOverflow;
+    if (timers.length) {
+      minimised = true;
+      root.classList.add('mini');
+      place('right:12px;bottom:12px');
+      return;
+    }
+    wantLock = false;
+    lock?.release().catch(() => {});
+    clearInterval(tickId);
+    document.removeEventListener('visibilitychange', onVisible);
+    host.remove();
+    document.title = origTitle;
+    audio?.close?.().catch(() => {});
+    try { speechSynthesis.cancel(); } catch {}
+    delete window.__kitchenMode;
+  };
+  document.addEventListener('visibilitychange', onVisible);
+  getLock();
+  open();
+  window.__kitchenMode = { close: () => { if (minimised) open(); else if (Date.now() - openedAt >= 1500) close(); } };
 })();
 }
 
@@ -1399,9 +1410,11 @@ function startTest() {
     if (!window.__kitchenMode) { trying = false; return; }
     if (trying) return;
     clearInterval(check);
+    clearTimeout(timeout);
     count('test_passed', { loader: !!document.querySelector('script[src$="/km.js"]'), touch: matchMedia('(pointer: coarse)').matches });
     testCue.innerHTML = '<span class="done">It works.</span> Close it, then use it the same way on any recipe.';
   }, 400);
+  var timeout = setTimeout(function () { clearInterval(check); }, 5 * 60 * 1000);
 }
 startTest();
 addEventListener('hashchange', startTest);
